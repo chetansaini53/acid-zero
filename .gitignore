@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+
+# Runtime / device state (never commit captures or secrets)
+*.pcap
+*.cap
+*.22000
+*.hccapx
+handshakes/
+handshakes_invalid/
+*.log
+acid_*.tmp
+
+# Local secrets / device config (keep these OUT of the repo)
+config.toml
+*.key
+*_key
+.env
+.aider*
+
+# ESP32 firmware build output (keep the flashable prebuilt/ bin, drop build/)
+firmware/**/build/
+apple2.py

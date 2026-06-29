@@ -1,0 +1,9 @@
+{
+  "type": "native",
+  "name": "Native Demo",
+  "icon": "usb",
+  "color": [30, 200, 121],
+  "exec": "hello.py",
+  "author": "acid",
+  "desc": "Template: any compiled/3rd-party app that owns /dev/fb1 + touch and exits on tap."
+}

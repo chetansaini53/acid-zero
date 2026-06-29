@@ -1,0 +1,8 @@
+[Unit]
+Description=ACID - prune invalid WPA handshakes before wpa-sec upload
+After=pwnagotchi.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/acid-hs-clean.sh --apply
+Nice=10

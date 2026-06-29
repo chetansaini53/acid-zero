@@ -1,0 +1,80 @@
+<svg viewBox="0 0 1000 800" xmlns="http://www.w3.org/2000/svg" role="img" font-family="Segoe UI, Roboto, Arial, sans-serif">
+<title>CC1101 to ESP32 wiring diagram</title>
+<desc>CC1101 433MHz module connected to an ESP32-WROOM-32 DevKit: GND-GND, VCC-3V3, GDO0-D4, CSN-D5, SCK-D18, MOSI-D23, MISO-D19, GDO2 not connected. The ESP32 acts as a Sub-GHz co-processor talking to a Raspberry Pi over USB serial.</desc>
+<rect x="0" y="0" width="1000" height="800" rx="14" fill="#0e1525"/>
+<text x="500" y="40" text-anchor="middle" fill="#e8eef7" font-size="25" font-weight="700">CC1101  ↔  ESP32 — Sub-GHz Co-Processor Wiring</text>
+<text x="500" y="64" text-anchor="middle" fill="#8a97ab" font-size="14">Acid Zero · ESP32-WROOM-32 (30-pin DevKit) · CC1101 433 MHz · ESP32 has no display → SPI fully free</text>
+
+<!-- ============ CC1101 module ============ -->
+<rect x="150" y="158" width="170" height="222" rx="10" fill="#14305f" stroke="#2f5aa0" stroke-width="2"/>
+<text x="235" y="184" text-anchor="middle" fill="#cfe0ff" font-size="16" font-weight="700">CC1101</text>
+<text x="235" y="201" text-anchor="middle" fill="#7fa0d8" font-size="11">433 MHz · 2×4 header</text>
+<circle cx="133" cy="269" r="13" fill="none" stroke="#d4af37" stroke-width="3"/>
+<line x1="146" y1="269" x2="150" y2="269" stroke="#d4af37" stroke-width="5"/>
+<text x="133" y="300" text-anchor="middle" fill="#9a8a40" font-size="10">SMA</text>
+<g font-size="13">
+<text x="300" y="182" text-anchor="end" fill="#e8eef7">1 GND</text><rect x="320" y="172" width="14" height="12" rx="2" fill="#9aa4b2"/>
+<text x="300" y="207" text-anchor="end" fill="#e8eef7">2 VCC</text><rect x="320" y="197" width="14" height="12" rx="2" fill="#ff5a5a"/>
+<text x="300" y="232" text-anchor="end" fill="#e8eef7">3 GDO0</text><rect x="320" y="222" width="14" height="12" rx="2" fill="#ffb02e"/>
+<text x="300" y="257" text-anchor="end" fill="#e8eef7">4 CSN</text><rect x="320" y="247" width="14" height="12" rx="2" fill="#45c46a"/>
+<text x="300" y="282" text-anchor="end" fill="#e8eef7">5 SCK</text><rect x="320" y="272" width="14" height="12" rx="2" fill="#4aa3ff"/>
+<text x="300" y="307" text-anchor="end" fill="#e8eef7">6 MOSI</text><rect x="320" y="297" width="14" height="12" rx="2" fill="#b06cff"/>
+<text x="300" y="332" text-anchor="end" fill="#e8eef7">7 MISO</text><rect x="320" y="322" width="14" height="12" rx="2" fill="#2ad0e0"/>
+<text x="300" y="357" text-anchor="end" fill="#8a97ab">8 GDO2</text><rect x="320" y="347" width="14" height="12" rx="2" fill="#5a6270"/>
+</g>
+
+<!-- ============ ESP32 board ============ -->
+<rect x="640" y="110" width="216" height="456" rx="10" fill="#16181d" stroke="#30343f" stroke-width="2"/>
+<rect x="722" y="92" width="56" height="22" rx="3" fill="#9aa1ad"/>
+<text x="750" y="107" text-anchor="middle" fill="#2a2e36" font-size="10" font-weight="700">USB</text>
+<text x="792" y="100" fill="#45c46a" font-size="12" font-weight="700">→ to Raspberry Pi</text>
+<text x="792" y="114" fill="#7fa0d8" font-size="10">/dev/ttyUSB0</text>
+<rect x="668" y="300" width="160" height="120" rx="4" fill="#2a2e36" stroke="#454b57"/>
+<text x="748" y="356" text-anchor="middle" fill="#aab3c2" font-size="13" font-weight="600">ESP32</text>
+<text x="748" y="374" text-anchor="middle" fill="#7c8696" font-size="11">WROOM-32</text>
+<polyline points="700,430 712,430 712,438 724,438 724,430 736,430 736,438 748,438" fill="none" stroke="#5a6270" stroke-width="2"/>
+<g font-size="13">
+<rect x="626" y="132" width="14" height="12" rx="2" fill="#ff5a5a"/><text x="650" y="142" fill="#e8eef7" font-weight="700">3V3</text>
+<rect x="626" y="160" width="14" height="12" rx="2" fill="#9aa4b2"/><text x="650" y="170" fill="#e8eef7" font-weight="700">GND</text>
+<rect x="626" y="188" width="14" height="12" rx="2" fill="#3a3f49"/><text x="650" y="198" fill="#6b7585" font-size="11">D15</text>
+<rect x="626" y="216" width="14" height="12" rx="2" fill="#3a3f49"/><text x="650" y="226" fill="#6b7585" font-size="11">D2</text>
+<rect x="626" y="244" width="14" height="12" rx="2" fill="#ffb02e"/><text x="650" y="254" fill="#e8eef7" font-weight="700">D4</text>
+<rect x="626" y="272" width="14" height="12" rx="2" fill="#3a3f49"/><text x="650" y="282" fill="#6b7585" font-size="11">RX2</text>
+<rect x="626" y="300" width="14" height="12" rx="2" fill="#3a3f49"/><text x="650" y="310" fill="#6b7585" font-size="11">TX2</text>
+<rect x="626" y="328" width="14" height="12" rx="2" fill="#45c46a"/><text x="650" y="338" fill="#e8eef7" font-weight="700">D5</text>
+<rect x="626" y="356" width="14" height="12" rx="2" fill="#4aa3ff"/><text x="650" y="366" fill="#e8eef7" font-weight="700">D18</text>
+<rect x="626" y="384" width="14" height="12" rx="2" fill="#b06cff"/><text x="650" y="394" fill="#e8eef7" font-weight="700">D19</text>
+<rect x="626" y="412" width="14" height="12" rx="2" fill="#3a3f49"/><text x="650" y="422" fill="#6b7585" font-size="11">D21</text>
+<rect x="626" y="440" width="14" height="12" rx="2" fill="#3a3f49"/><text x="650" y="450" fill="#6b7585" font-size="11">RX0</text>
+<rect x="626" y="468" width="14" height="12" rx="2" fill="#3a3f49"/><text x="650" y="478" fill="#6b7585" font-size="11">TX0</text>
+<rect x="626" y="496" width="14" height="12" rx="2" fill="#3a3f49"/><text x="650" y="506" fill="#6b7585" font-size="11">D22</text>
+<rect x="626" y="524" width="14" height="12" rx="2" fill="#2ad0e0"/><text x="650" y="534" fill="#e8eef7" font-weight="700">D23</text>
+</g>
+
+<!-- ============ wires ============ -->
+<g fill="none" stroke-width="3.5" stroke-linecap="round">
+<path d="M334,178 C485,178 485,166 626,166" stroke="#9aa4b2"/>
+<path d="M334,203 C485,203 485,138 626,138" stroke="#ff5a5a"/>
+<path d="M334,228 C485,228 485,250 626,250" stroke="#ffb02e"/>
+<path d="M334,253 C485,253 485,334 626,334" stroke="#45c46a"/>
+<path d="M334,278 C485,278 485,362 626,362" stroke="#4aa3ff"/>
+<path d="M334,303 C485,303 485,390 626,390" stroke="#b06cff"/>
+<path d="M334,328 C485,328 485,530 626,530" stroke="#2ad0e0"/>
+<path d="M334,353 L430,353" stroke="#5a6270" stroke-dasharray="5 5"/>
+</g>
+<text x="438" y="357" fill="#6b7585" font-size="12">GDO2 — NC (not needed)</text>
+
+<!-- ============ legend ============ -->
+<text x="150" y="604" fill="#e8eef7" font-size="15" font-weight="700">Connections</text>
+<g font-size="14">
+<rect x="150" y="620" width="24" height="13" rx="2" fill="#9aa4b2"/><text x="185" y="631" fill="#cfd7e3">Pin 1 GND  →  GND</text>
+<rect x="150" y="648" width="24" height="13" rx="2" fill="#ff5a5a"/><text x="185" y="659" fill="#cfd7e3">Pin 2 VCC  →  3V3</text>
+<rect x="150" y="676" width="24" height="13" rx="2" fill="#ffb02e"/><text x="185" y="687" fill="#cfd7e3">Pin 3 GDO0 →  D4</text>
+<rect x="150" y="704" width="24" height="13" rx="2" fill="#45c46a"/><text x="185" y="715" fill="#cfd7e3">Pin 4 CSN  →  D5</text>
+<rect x="560" y="620" width="24" height="13" rx="2" fill="#4aa3ff"/><text x="595" y="631" fill="#cfd7e3">Pin 5 SCK  →  D18</text>
+<rect x="560" y="648" width="24" height="13" rx="2" fill="#b06cff"/><text x="595" y="659" fill="#cfd7e3">Pin 6 MOSI →  D19</text>
+<rect x="560" y="676" width="24" height="13" rx="2" fill="#2ad0e0"/><text x="595" y="687" fill="#cfd7e3">Pin 7 MISO →  D23</text>
+<rect x="560" y="704" width="24" height="13" rx="2" fill="#5a6270"/><text x="595" y="715" fill="#8a97ab">Pin 8 GDO2 →  not connected</text>
+</g>
+<text x="500" y="760" text-anchor="middle" fill="#8a97ab" font-size="12">GDO0 → D4 (not D2 — D2 is a boot/strapping pin).  All wires land on the ESP32 LEFT edge.  3.3V only — never 5V.</text>
+</svg>

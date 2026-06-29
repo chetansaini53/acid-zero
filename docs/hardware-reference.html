@@ -1,0 +1,151 @@
+<!doctype html><meta charset="utf-8"><title>Acid Zero - Hardware Reference</title>
+<style>
+body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:900px;margin:24px auto;
+padding:0 24px;color:#14181f;line-height:1.5;font-size:15px;background:#fff}
+h1.t{font-size:26px;margin:0 0 2px;color:#0b4380}
+.sub{color:#5a6675;margin:0 0 14px;font-size:14px}
+h1{font-size:18px;color:#0b4380;border-bottom:2px solid #0b4380;padding-bottom:3px;margin:26px 0 8px}
+h2{font-size:14px;color:#2a3340;margin:14px 0 4px}
+p{margin:3px 0}
+pre{background:#f3f5f8;border:1px solid #dde3ea;border-radius:6px;padding:7px 10px;margin:4px 0;
+font-family:Consolas,Menlo,monospace;font-size:12.5px;white-space:pre-wrap;color:#10202e}
+.meta{background:#0b4380;color:#dce8f5;border-radius:8px;padding:10px 14px;font-size:12.5px;
+font-family:Consolas,monospace;white-space:pre-wrap}
+hr{border:0;border-top:1px solid #dde3ea;margin:10px 0}
+.foot{color:#7a8694;font-size:12px;margin-top:24px;border-top:1px solid #dde3ea;padding-top:8px}
+@media print{body{margin:0;max-width:none;font-size:11.5pt}h1{page-break-after:avoid}pre{page-break-inside:avoid}}
+</style>
+<h1 class="t">Acid Zero &mdash; Hardware &amp; Porting Reference</h1>
+<p class="sub">Raspberry Pi 3B+ pentest handheld &middot; reference for porting C/C++/Rust/Python/Flipper code</p>
+<div class="meta">Raspberry Pi 3 Model B Plus Rev 1.4  (rev a020d4)
+Debian GNU/Linux 13 (trixie)  kernel 6.12.62+rpt-rpi-v8 aarch64
+generated 2026-06-27 21:06</div>
+<h1>1. SYSTEM OVERVIEW (live)</h1>
+<p>Board : Raspberry Pi 3 Model B Plus Rev 1.4  (rev a020d4)</p>
+<p>OS    : Debian GNU/Linux 13 (trixie)   kernel 6.12.62+rpt-rpi-v8  (aarch64)</p>
+<p>RAM   : 955 MB</p>
+<p>Active dtoverlays: dtoverlay=disable-wifi dtoverlay=dwc2 dtoverlay=dwc2,dr_mode=host dtoverlay=piscreen,speed=16000000,rotate=270 dtoverlay=spi0-2cs dtoverlay=vc4-kms-v3d</p>
+<p>I2C buses: /dev/i2c-1 /dev/i2c-2     SPI char devs: none (SPI0 consumed by TFT overlay)</p>
+
+<h1>2. DISPLAY - ILI9486 TFT</h1>
+<p>Panel: ILI9486  480x320  16bpp RGB565.  Driver: fbtft (piscreen overlay).  Node: /dev/fb1.</p>
+<p>Bus: SPI0 @ 16 MHz, rotate 270.  Overlay: dtoverlay=piscreen,speed=16000000,rotate=270</p>
+<h2>RGB565 pixel format (what every native app must write)</h2>
+<pre>v = ((R &amp; 0xF8) &lt;&lt; 8) | ((G &amp; 0xFC) &lt;&lt; 3) | (B &gt;&gt; 3)   # 16-bit
+byte order = little-endian, 2 bytes/px.  frame = 480*320*2 = 307200 bytes
+pixel (x,y) byte offset = (y*480 + x) * 2</pre>
+<p>To draw: build a 480x320 RGB565 buffer and write the whole frame to /dev/fb1 (or mmap it).</p>
+<h2>SPI wiring (piscreen standard, SPI0)</h2>
+<pre>MOSI GPIO10 (pin19)   SCLK GPIO11 (pin23)   LCD-CS CE0 GPIO8 (pin24)
+TOUCH-CS CE1 GPIO7 (pin26)   DC GPIO24   RESET GPIO25   backlight GPIO18</pre>
+<h2>ILI9486 command set (bare-metal SPI port)</h2>
+<pre>0x01 SWRESET  0x11 SLPOUT  0x29 DISPON  0x36 MADCTL(rotation)  0x3A COLMOD(0x55=16bpp)
+0x2A CASET(col)  0x2B PASET(page)  0x2C RAMWR(pixel data follows)</pre>
+
+<h1>3. TOUCH - ADS7846 / XPT2046</h1>
+<p>event0: ADS7846 Touchscreen   on SPI0 CE1 (GPIO7) + IRQ GPIO.  Linux input event device, 12-bit X/Y.</p>
+<p>Acid Zero uses 4-point AFFINE calibration (least-squares), residual gate &lt;= 45 px.</p>
+<h2>Raw read (bare-metal SPI)</h2>
+<pre>TX 0x90 -&gt; read 2 bytes -&gt; Y (&gt;&gt;3 = 12-bit).   TX 0xD0 -&gt; read 2 bytes -&gt; X (&gt;&gt;3).</pre>
+<h2>Linux input_event struct (read from /dev/input/eventN)</h2>
+<pre>{ struct timeval time; __u16 type; __u16 code; __s32 value; }  (16B on 32-bit / 24B 64-bit)
+EV_SYN=0  EV_KEY=1  EV_ABS=3 | ABS_X=0x00  ABS_Y=0x01 | BTN_TOUCH=0x14a</pre>
+
+<h1>4. NATIVE PLUGIN CONTRACT (add ANY app, incl compiled C/C++/Rust)</h1>
+<p>Drop a folder:  /usr/local/lib/acid-apps/&lt;yourapp&gt;/  containing app.json + an executable.</p>
+<h2>app.json manifest</h2>
+<pre>{ &quot;type&quot;:&quot;native&quot;, &quot;name&quot;:&quot;My App&quot;, &quot;icon&quot;:&quot;usb&quot;,
+  &quot;color&quot;:[30,200,121], &quot;exec&quot;:&quot;mybin&quot;  }   # exec = binary or script in the folder</pre>
+<h2>Runtime contract</h2>
+<p>1) Your program OWNS /dev/fb1 + the touch event device while it runs.</p>
+<p>2) Render RGB565 frames (see section 2); read taps from the ADS7846 evdev node.</p>
+<p>3) EXIT(0) on your exit gesture. The launcher is BLOCKED on you and redraws home on return.</p>
+<p>Find devices by NAME, not number (fb#/event# reshuffle each boot):</p>
+<pre>fb   -&gt; match &#x27;ili9486&#x27; / &#x27;fb_ili9486&#x27; in /sys/class/graphics/fb*/name
+touch-&gt; match &#x27;ADS7846&#x27; in /sys/class/input/event*/device/name</pre>
+<p>Language-agnostic: anything that can open /dev/fb1 + an evdev node works (C/C++/Rust/Go/Py).</p>
+<p>Reference template: /usr/local/lib/acid-apps/hello-native/ (standalone Python).</p>
+<h2>Python in-process plugins (lighter alternative)</h2>
+<pre>/usr/local/lib/acid-apps/*.py  with  META={name,icon,color}  +  draw(d,ctx)
+optional: on_enter(ctx), handle_touch(tx,ty,ctx).  Shares the launcher Ctx (fonts/colors/helpers).</pre>
+
+<h1>5. WiFi RADIOS</h1>
+<p>Bind adapters by USB VID:PID, NEVER by wlanN (interface numbers reshuffle every boot).</p>
+<pre>VID:PID     chipset      module       bands     role
+onboard     BCM43455     built-in     2.4/5     limited monitor
+0e8d:7612   MT7612U      AWUS036ACM   2.4/5     monitor+inject
+0bda:8812   RTL8812AU    AWUS036ACH   2.4/5     AP+inject
+2357:0120   RTL8821AU    Archer T2U+  2.4/5     client/SSH
+0bda:8179   RTL8188EUS   generic      2.4 only  client</pre>
+<h2>live interface -&gt; driver map</h2>
+<pre>wlan0     brcmfmac
+wlan0mon  mt76x2u
+wlan1     rtl8821au
+wlan2     rtl8812au
+wlan3     mt76x2u
+wlan4     rtl8xxxu</pre>
+<p>mt76x2u exposes a base iface + a monitor iface (wlan0mon). brcmfmac = onboard BCM43455.</p>
+
+<h1>6. BLUETOOTH / BLE</h1>
+<p>Controller: hci0, Broadcom over UART, BD addr B8:27:EB:59:00:11.</p>
+<p>Acid Zero BLE spam uses a RAW HCI USER-channel socket (HCI_CHANNEL_USER=1); bluetoothd is stopped</p>
+<p>for exclusive control. ~32 adv frames/sec. own_addr_type MUST be 01 (random) or iOS dedups.</p>
+<h2>Key HCI LE commands (OGF 0x08)</h2>
+<pre>OCF 0x0005 LE Set Random Address   0x0006 LE Set Adv Params   0x0008 LE Set Adv Data
+OCF 0x000A LE Set Adv Enable        ioctl HCIDEVDOWN = 0x400448ca</pre>
+<h2>BLE advertising payloads implemented (Flipper BLE-spam port reference)</h2>
+<pre>Apple Continuity : mfg Company 0x004C; ProximityPair type 0x07 + 2B model; NearbyAction 0x0F flags 0xC0
+Google Fast Pair : 02 01 06 | 03 03 2C FE | 06 16 2C FE &lt;3B model&gt;  (Google validates model IDs)
+Samsung          : mfg Company 0x0075      Microsoft Swift Pair: mfg Company 0x0006</pre>
+<h2>BLE scan (read-only recon)</h2>
+<p>btmon decodes each adv report (Company-ID-&gt;vendor, OUI, name, appearance, Apple model, Fast-Pair model).</p>
+<pre>drive discovery:  sleep N | timeout M btmgmt find -l   (keep stdin open; btmgmt stops on EOF)</pre>
+
+<h1>7. SUB-GHz - CC1101 (planned: porting guide)</h1>
+<p>CC1101 = SPI sub-GHz transceiver: 300-348 / 387-464 / 779-928 MHz. Same family Flipper uses,</p>
+<p>so .sub OOK/ASK captures are conceptually portable.</p>
+<h2>WIRING PROBLEM on this build</h2>
+<p>SPI0 is fully consumed by the TFT + touch (piscreen). For CC1101 use one of:</p>
+<p>  a) SPI1 - enable dtoverlay=spi1-1cs : MISO GPIO19(p35) MOSI GPIO20(p38) SCLK GPIO21(p40) CE GPIO18/16/17</p>
+<p>     (watch GPIO18 vs backlight clash)</p>
+<p>  b) bit-bang SPI on spare GPIOs    c) time-share SPI0 2nd CS (risky during display refresh)</p>
+<h2>CC1101 register/strobe basics</h2>
+<pre>FREQ2/1/0 carrier  MDMCFG2 (ASK/OOK)  PKTCTRL0/1  DEVIATN  AGCCTRL  FSCAL  TEST
+strobes: SRES 0x30  SRX 0x34  STX 0x35  SIDLE 0x36  SFRX 0x3A  SFTX 0x3B   FIFO 0x3F(burst)
+freq: f = FREQ * 26MHz / 2^16     433.92 MHz -&gt; FREQ ~= 0x10B071</pre>
+<p>Stacks: SmartRC-CC1101 (Arduino port), pi433, python cc1101 over spidev. OOK replay via GDO0 timing.</p>
+<p>Flipper .sub porting: parse RAW_Data timings -&gt; toggle GDO0 TX (timed) or CC1101 async TX.</p>
+
+<h1>8. NFC / RFID - PN532 (planned: porting guide)</h1>
+<p>PN532 = 13.56 MHz NFC: ISO14443A/B, MIFARE Classic/Ultralight, FeliCa, NDEF, card emulation.</p>
+<p>Selectable bus by DIP: I2C / SPI / HSU(UART).</p>
+<h2>RECOMMENDED here: I2C  (I2C-1 is FREE; SPI0 is busy with the TFT)</h2>
+<pre>SDA GPIO2 (pin3)   SCL GPIO3 (pin5)   VCC 3V3   GND   addr 0x24   (IRQ optional GPIO)</pre>
+<p>Software: libnfc (device = pn532_i2c:/dev/i2c-1), Adafruit-PN532 (python I2C), nfcpy (UART).</p>
+<p>MIFARE Classic keys: mfoc / mfcuk + libnfc.</p>
+<p>NOTE: 125 kHz RFID (EM4100/HID) needs a DIFFERENT front-end (RDM6300 UART / EM4095) - PN532 is</p>
+<p>13.56 MHz only. (Flipper covers both bands via separate hardware front-ends.)</p>
+<p>Flipper NFC porting: dump = UID + sector keys + blocks; replay via PN532 emulation or a magic card.</p>
+
+<h1>9. IR (planned)</h1>
+<p>TX: 38 kHz carrier via dtoverlay=gpio-ir-tx (a TX GPIO).  RX: dtoverlay=gpio-ir.</p>
+<p>Tools: LIRC or ir-ctl.  Flipper .ir (protocol/address/command) -&gt; LIRC config or raw timing.</p>
+
+<h1>10. GPIO / BUS AVAILABILITY MAP (this build)</h1>
+<pre>SPI0      : BUSY  - ILI9486 (CE0) + ADS7846 touch (CE1)
+SPI1      : FREE  - candidate for CC1101  (enable dtoverlay=spi1-1cs)
+I2C-1     : FREE  - candidate for PN532   (GPIO2/3)
+I2C-2     : present
+UART0     : GPIO14/15 - console/BT, handle with care
+USB       : 4x WiFi dongles via onboard hub
+free GPIO : 5 6 12 13 16 17 19 20 21 22 23 26 27  (verify vs active overlays before use)</pre>
+
+<h1>11. PORTING FLIPPER CODE -&gt; Acid Zero (cheat-sheet)</h1>
+<pre>UI      : Flipper Canvas 128x64 mono  -&gt;  fb1 480x320 RGB565 (map canvas_draw_* to PIL/fb)
+Buttons : Flipper D-pad/OK            -&gt;  ADS7846 taps (evdev)
+Sub-GHz : Flipper CC1101              -&gt;  Pi CC1101 on SPI1 (same chip: port reg init + .sub)
+NFC     : Flipper ST25R3916           -&gt;  PN532 (diff chip: port logic via libnfc, not regs)
+BLE spam: apple_ble_spam.c payloads   -&gt;  already done via raw HCI (section 6)
+IR      : .ir files                   -&gt;  LIRC / ir-ctl
+Apps    : compile to ARM64 (aarch64)  -&gt;  drop as native plugin (section 4)</pre>
+<div class="foot">Acid Zero &middot; Chetan Saini &middot; ITOB &middot; own-lab / educational reference</div>

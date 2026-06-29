@@ -1,0 +1,10 @@
+[Unit]
+Description=ACID handshake cleaner - every 30 min (before wpa-sec upload cycles)
+
+[Timer]
+OnBootSec=5min
+OnCalendar=*:00/30
+Persistent=true
+
+[Install]
+WantedBy=timers.target

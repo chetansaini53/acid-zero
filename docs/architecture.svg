@@ -1,0 +1,79 @@
+<svg viewBox="0 0 1000 560" xmlns="http://www.w3.org/2000/svg" role="img" font-family="Segoe UI, Roboto, Arial, sans-serif">
+<title>Acid Zero architecture — Pi client to CC1101 over an ESP32 co-processor</title>
+<desc>Raspberry Pi Python launcher (framebuffer UI) talks over USB serial to an ESP32 co-processor, which drives a CC1101 sub-GHz transceiver over SPI; the RF goes out an SMA antenna.</desc>
+<rect x="0" y="0" width="1000" height="560" rx="14" fill="#0e1525"/>
+<text x="500" y="40" text-anchor="middle" fill="#e8eef7" font-size="25" font-weight="700">Acid Zero — System Architecture</text>
+<text x="500" y="64" text-anchor="middle" fill="#8a97ab" font-size="14">UI brain on the Pi · radio brain on a dedicated ESP32 co-processor (the Flipper pattern)</text>
+
+<!-- ============ Raspberry Pi ============ -->
+<rect x="40" y="92" width="300" height="404" rx="12" fill="#15171c" stroke="#a23b3b" stroke-width="2"/>
+<text x="190" y="116" text-anchor="middle" fill="#ff7a7a" font-size="16" font-weight="700">Raspberry Pi 3B+  (the brain / UI)</text>
+
+<rect x="60" y="130" width="260" height="70" rx="8" fill="#1b2230" stroke="#2a3550"/>
+<text x="190" y="150" text-anchor="middle" fill="#e8eef7" font-size="13" font-weight="700">Launcher  (Python, ~1500 LOC)</text>
+<text x="190" y="168" text-anchor="middle" fill="#8a97ab" font-size="11">framebuffer UI · screen state machine</text>
+<text x="190" y="184" text-anchor="middle" fill="#8a97ab" font-size="11">dirty-flag render · evdev touch</text>
+
+<rect x="60" y="208" width="260" height="60" rx="8" fill="#1b2230" stroke="#2a3550"/>
+<text x="190" y="228" text-anchor="middle" fill="#cfe0ff" font-size="13" font-weight="700">Sub-GHz plugin (subghz.py)</text>
+<text x="190" y="246" text-anchor="middle" fill="#8a97ab" font-size="11">Analyze · Record · Replay · Saved</text>
+<text x="190" y="260" text-anchor="middle" fill="#8a97ab" font-size="11">waveform graph · daemon workers</text>
+
+<rect x="60" y="276" width="260" height="56" rx="8" fill="#1b2230" stroke="#2a3550"/>
+<text x="190" y="296" text-anchor="middle" fill="#cfe0ff" font-size="13" font-weight="700">SubGhz client (acid_subghz.py)</text>
+<text x="190" y="314" text-anchor="middle" fill="#8a97ab" font-size="11">pyserial · command/response protocol</text>
+
+<rect x="60" y="340" width="260" height="50" rx="8" fill="#2a2e36" stroke="#454b57"/>
+<text x="190" y="362" text-anchor="middle" fill="#aab3c2" font-size="12" font-weight="600">3.5" ILI9486 TFT  (SPI0, /dev/fb0)</text>
+<text x="190" y="378" text-anchor="middle" fill="#7c8696" font-size="10">+ ADS7846 resistive touch</text>
+
+<rect x="60" y="398" width="260" height="44" rx="8" fill="#2a2e36" stroke="#454b57"/>
+<text x="190" y="416" text-anchor="middle" fill="#aab3c2" font-size="12" font-weight="600">4× USB Wi-Fi + onboard BLE</text>
+<text x="190" y="431" text-anchor="middle" fill="#7c8696" font-size="10">bound by USB VID:PID</text>
+
+<text x="190" y="470" text-anchor="middle" fill="#7c8696" font-size="11">base OS: jayofelony pwnagotchi</text>
+
+<!-- ============ ESP32 ============ -->
+<rect x="430" y="150" width="270" height="220" rx="12" fill="#16181d" stroke="#3b7a3b" stroke-width="2"/>
+<text x="565" y="174" text-anchor="middle" fill="#7ee07e" font-size="16" font-weight="700">ESP32-WROOM-32</text>
+<text x="565" y="192" text-anchor="middle" fill="#8a97ab" font-size="11">co-processor / radio brain</text>
+<rect x="450" y="204" width="230" height="62" rx="8" fill="#1b2230" stroke="#2a3550"/>
+<text x="565" y="224" text-anchor="middle" fill="#cfe0ff" font-size="12" font-weight="700">firmware (Arduino)</text>
+<text x="565" y="241" text-anchor="middle" fill="#8a97ab" font-size="11">serial parser · ELECHOUSE CC1101</text>
+<text x="565" y="256" text-anchor="middle" fill="#8a97ab" font-size="11">modulation profiles · RMT capture</text>
+<rect x="450" y="274" width="230" height="40" rx="8" fill="#2a2e36" stroke="#454b57"/>
+<text x="565" y="298" text-anchor="middle" fill="#aab3c2" font-size="11" font-weight="600">RMT peripheral = hw-precise timing</text>
+<text x="565" y="338" text-anchor="middle" fill="#7c8696" font-size="11">dual-core · USB-CDC to the Pi</text>
+
+<!-- ============ CC1101 ============ -->
+<rect x="790" y="170" width="170" height="180" rx="12" fill="#14305f" stroke="#2f5aa0" stroke-width="2"/>
+<text x="875" y="196" text-anchor="middle" fill="#cfe0ff" font-size="15" font-weight="700">CC1101</text>
+<text x="875" y="214" text-anchor="middle" fill="#7fa0d8" font-size="11">sub-GHz transceiver</text>
+<text x="875" y="236" text-anchor="middle" fill="#8a97ab" font-size="11">300–928 MHz</text>
+<text x="875" y="252" text-anchor="middle" fill="#8a97ab" font-size="11">ASK/OOK · 2-FSK</text>
+<circle cx="875" cy="296" r="16" fill="none" stroke="#d4af37" stroke-width="3"/>
+<line x1="875" y1="312" x2="875" y2="334" stroke="#d4af37" stroke-width="4"/>
+<text x="875" y="332" text-anchor="middle" fill="#9a8a40" font-size="10">SMA</text>
+
+<!-- ============ links ============ -->
+<g font-size="12" font-weight="700">
+<line x1="340" y1="240" x2="430" y2="240" stroke="#45c46a" stroke-width="3" marker-end="url(#a)"/>
+<line x1="430" y1="252" x2="340" y2="252" stroke="#45c46a" stroke-width="3" marker-end="url(#a)"/>
+<text x="385" y="232" text-anchor="middle" fill="#7ee07e">USB</text>
+<text x="385" y="276" text-anchor="middle" fill="#7ee07e">serial</text>
+<line x1="700" y1="250" x2="790" y2="250" stroke="#4aa3ff" stroke-width="3" marker-end="url(#b)"/>
+<line x1="790" y1="262" x2="700" y2="262" stroke="#4aa3ff" stroke-width="3" marker-end="url(#b)"/>
+<text x="745" y="242" text-anchor="middle" fill="#4aa3ff">SPI</text>
+<text x="745" y="286" text-anchor="middle" fill="#4aa3ff">+GDO0</text>
+<line x1="875" y1="334" x2="875" y2="360" stroke="#d4af37" stroke-width="2"/>
+<text x="875" y="380" text-anchor="middle" fill="#d4af37" font-size="11">RF 433 MHz</text>
+</g>
+<defs>
+<marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#45c46a"/></marker>
+<marker id="b" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#4aa3ff"/></marker>
+</defs>
+
+<!-- ============ flow strip ============ -->
+<rect x="40" y="512" width="920" height="34" rx="8" fill="#11202b"/>
+<text x="500" y="534" text-anchor="middle" fill="#9fd0c0" font-size="13" font-weight="700">Pi launcher (Python)  →  USB serial  →  ESP32 firmware  →  SPI + GDO0  →  CC1101  →  RF antenna</text>
+</svg>
