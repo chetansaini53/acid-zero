@@ -15,17 +15,22 @@ except Exception as _e:
     SubGhz = None
     PROFILES = ['AM_DEFAULT', 'AM_WIDE', 'AM_NARROW', 'FM_FSK']
     _IMPORT_ERR = _e
+try:
+    import subghz_proto as _proto   # pure OOK codec (decode/encode/verify)
+except Exception:
+    _proto = None
 
 META = {'name': 'Sub-GHz', 'icon': 'radio', 'color': (175, 125, 235)}
 
 SAVE_DIR = '/home/ella3/acid_subghz_saved'
 PRESETS = [315.0, 433.92, 868.0, 915.0]
 KB = ['1234567890', 'QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM']
+HEXKB = ['0123456789', 'ABCDEF']
 
 _sg = None
 _busy = False
 _status = 'SCAN to identify, AUTO/RECORD to capture'
-_view = 'main'                 # 'main' | 'saved' | 'savename'
+_view = 'main'                 # 'main' | 'saved' | 'savename' | 'addman'
 _freq = 433.92
 _prof = 'AM_DEFAULT'
 _pulses = 0
@@ -34,6 +39,9 @@ _rec_frames = 0
 _an_rssi = None
 _saved = []
 _name = ''
+_decoded = None                # last ProtoResult (auto-decode after capture/load)
+_dec_ok = False                # round-trip verified (EV1527)
+_man_key = ''                  # ADD MANUALLY hex entry
 _spawn_lock = threading.Lock()
 
 
@@ -55,6 +63,20 @@ def _set(ctx, s):
     _status = s
     try: ctx.mark_dirty()
     except Exception: pass
+
+
+# ---------- protocol decode (pure, off the render thread) ----------
+def _refresh_decode():
+    """Decode + round-trip-verify the current _frame. Safe to call in a worker."""
+    global _decoded, _dec_ok
+    if _proto is None or not _frame:
+        _decoded = None; _dec_ok = False; return
+    try:
+        snap = list(_frame)                       # snapshot: no tearing mid-decode
+        _decoded = _proto.decode(snap, _prof)
+        _dec_ok = (_decoded.protocol == 'EV1527' and _proto.verify(snap, _prof)[0])
+    except Exception:
+        _decoded = None; _dec_ok = False
 
 
 # ---------- saved library ----------
@@ -134,7 +156,7 @@ def _capture_store(ctx, label):
     _sg.set_config(freq=_freq)
     _sg.set_profile(_prof)
     _set(ctx, 'PRESS REMOTE - %s @ %.2f %s' % (label, _freq, _prof))
-    vals = _sg.capture(8)
+    vals = _sg.capture(6)
     nf = sum(1 for d in vals if d > 4000)
     frame = vals[:400]
     if frame:
@@ -154,7 +176,10 @@ def _w_record(ctx):
         frame, nf = _capture_store(ctx, 'recording')
         if frame:
             _frame = frame; _pulses = len(frame); _rec_frames = nf
-            _set(ctx, 'REC %.2f %s  %dp  %dfr' % (_freq, _prof, _pulses, nf))
+            _refresh_decode()
+            _set(ctx, 'REC %.2f %s  %dp  %dfr%s' % (
+                _freq, _prof, _pulses, nf,
+                '  ' + _decoded.protocol if _decoded and _decoded.protocol != 'UNKNOWN' else ''))
         else:
             _set(ctx, 'no signal - SCAN first / change MOD')
     except Exception as e:
@@ -174,14 +199,16 @@ def _w_auto(ctx):
         _an_rssi = pr
         if pf and pr is not None and pr > -62:
             _freq = pf
+        _prof = 'AM_NARROW'              # OOK default - skip the 3s classify for speed
         _sg.set_config(freq=_freq)
-        g = (_sg.classify().get('guess') or '').upper()
-        _prof = 'FM_FSK' if ('FSK' in g or 'FM' in g) else 'AM_NARROW'
         _sg.set_profile(_prof)
         frame, nf = _capture_store(ctx, 'recording')
         if frame:
             _frame = frame; _pulses = len(frame); _rec_frames = nf
-            _set(ctx, 'AUTO %.2f %s %dp %dfr' % (_freq, _prof, _pulses, nf))
+            _refresh_decode()
+            _set(ctx, 'AUTO %.2f %s %dp %dfr%s' % (
+                _freq, _prof, _pulses, nf,
+                '  ' + _decoded.protocol if _decoded and _decoded.protocol != 'UNKNOWN' else ''))
         else:
             _set(ctx, 'AUTO: no signal - retry')
     except Exception as e:
@@ -228,6 +255,7 @@ def _w_load_replay(ctx, path):
         else:
             _prof = 'AM_DEFAULT'; _frame = [int(x) for x in toks[1:]]
         _pulses = len(_frame)
+        _refresh_decode()
         if not _ensure():
             return
         _sg.set_config(freq=_freq)
@@ -249,6 +277,45 @@ def _w_delete(ctx, path):
         except Exception:
             pass
         _refresh_saved(); _set(ctx, 'deleted')
+    finally:
+        _busy = False; ctx.mark_dirty()
+
+
+def _w_decode(ctx):
+    """Manual DECODE of the current frame (auto-decode also runs after capture)."""
+    global _busy
+    try:
+        if _proto is None:
+            _set(ctx, 'proto module missing'); return
+        _refresh_decode()
+        if _decoded is not None and _decoded.protocol != 'UNKNOWN':
+            _set(ctx, 'DECODE %s  key %s  %db%s' % (
+                _decoded.protocol, _decoded.key_hex, _decoded.nbits,
+                '  VERIFIED' if _dec_ok else ''))
+        else:
+            _set(ctx, 'no protocol: %s' % (_decoded.note if _decoded else 'no signal'))
+    finally:
+        _busy = False; ctx.mark_dirty()
+
+
+def _w_addman(ctx):
+    """ADD MANUALLY: build an EV1527 frame from the entered hex key -> _frame."""
+    global _busy, _frame, _pulses, _prof, _view
+    try:
+        if _proto is None:
+            _set(ctx, 'proto module missing'); return
+        key = (_man_key or '').strip()
+        if not key:
+            _set(ctx, 'enter a hex key first'); return
+        pulses = _proto.encode(key, nbits=24, te=350, repeats=1)
+        _frame = pulses; _pulses = len(pulses); _prof = 'AM_NARROW'
+        _refresh_decode()
+        _view = 'main'
+        _set(ctx, 'built EV1527 %s @ %.2f - REPLAY/SAVE' % (key.upper(), _freq))
+    except ValueError as e:
+        _set(ctx, 'key err: %s' % str(e)[:26])
+    except Exception as e:
+        _set(ctx, 'encode err: %s' % str(e)[:24])
     finally:
         _busy = False; ctx.mark_dirty()
 
@@ -275,6 +342,7 @@ def on_enter(ctx):
                     _frame = f; _pulses = len(f)
             except Exception:
                 pass
+        _refresh_decode()              # auto-decode the loaded/last frame on entry
         _refresh_saved(); _ensure()
         try: ctx.mark_dirty()
         except Exception: pass
@@ -288,36 +356,54 @@ def _btn(ctx, d, box, label, fill, fg, font=None):
     ctx.ct(d, (box[0] + box[2]) // 2, (box[1] + box[3]) // 2, label, font or ctx.F_NM, fg)
 
 
-def _draw_wave(d, ctx, box, frame):
+def _draw_wave(d, ctx, box, frame, te=None):
+    """Real OOK waveform: time-proportional square wave, big gaps compressed,
+    bits actually visible (vs the old sum-scaled mush), with live metrics."""
     x0, y0, x1, y1 = box
     ctx.rr(d, box, fill=(8, 14, 22), outline=ctx.LINE, w=1, r=6)
-    midy = (y0 + y1) // 2
-    for gx in range(x0 + 40, x1 - 4, 56):          # sci-fi grid
-        d.line([(gx, y0 + 4), (gx, y1 - 4)], fill=(20, 36, 32), width=1)
-    d.line([(x0 + 4, midy), (x1 - 4, midy)], fill=(20, 36, 32), width=1)
+    yhi, ylo = y0 + 18, y1 - 12
     if not frame:
-        ctx.ct(d, (x0 + x1) // 2, midy, 'no signal captured', ctx.F_SM, ctx.DIM)
+        ctx.ct(d, (x0 + x1) // 2, (y0 + y1) // 2, 'no signal - RECORD or AUTO', ctx.F_SM, ctx.DIM)
         return
-    N = min(len(frame), 220)
-    total = sum(frame[:N]) or 1
-    w = x1 - x0 - 10
-    yhi = y0 + 10; ylo = y1 - 10
-    x = x0 + 5; level = 1
-    poly = [(x, ylo)]
-    for i in range(N):
-        seg = max(1, int(w * frame[i] / total))
-        yy = yhi if level else ylo
-        poly.append((x, yy)); poly.append((x + seg, yy))
-        x += seg; level ^= 1
-        if x >= x1 - 5:
+    # base time unit te: decoded value if known, else robust short-pulse estimate
+    if not te:
+        srt = sorted(p for p in frame if p > 30)
+        te = srt[len(srt) // 6] if srt else 350
+    te = max(int(te), 1)
+    gap_thr = te * 6                      # a LOW wider than this = inter-frame gap
+    px_per_us = 4.0 / te                  # short pulse ~ 4px so bits are readable
+    gap_px = 16                           # compress big gaps to a fixed marker width
+    xL, xR = x0 + 7, x1 - 7
+    # faint time grid (~ one byte of bit-cells per division)
+    gstep = max(int(te * 8 * px_per_us), 20)
+    gx = xL + gstep
+    while gx < xR:
+        d.line([(gx, y0 + 6), (gx, y1 - 6)], fill=(18, 32, 28), width=1)
+        gx += gstep
+    # metrics row (real totals even if the trace is truncated to fit)
+    ctx.lt(d, x0 + 9, y0 + 5, '%.1f ms   %d edges   te %dus' % (
+        sum(frame) / 1000.0, len(frame), te), ctx.F_TINY, (120, 165, 150))
+    # square wave: time-proportional; gaps compressed + dimmed
+    x, level, prev_y, shown = xL, 1, ylo, 0   # capture is phase-aligned to carrier-ON (HIGH)
+    for dur in frame:
+        is_gap = (level == 0 and dur >= gap_thr)
+        seg = gap_px if is_gap else max(1, int(dur * px_per_us))
+        if x + seg > xR:
             break
-    for i in range(len(poly) - 1):
-        d.line([poly[i], poly[i + 1]], fill=ctx.ACC, width=2)
+        yy = yhi if level else ylo
+        d.line([(x, prev_y), (x, yy)], fill=ctx.ACC, width=2)              # vertical edge
+        d.line([(x, yy), (x + seg, yy)],
+               fill=(70, 95, 88) if is_gap else ctx.ACC, width=2)          # level run
+        prev_y = yy; x += seg; level ^= 1; shown += 1
+    d.line([(x, prev_y), (x, ylo)], fill=ctx.ACC, width=1)                 # close to baseline
+    if shown < len(frame):
+        ctx.ct(d, xR - 10, ylo - 4, '>>', ctx.F_TINY, ctx.DIM)
 
 
 # ---------- view: MAIN (combined) ----------
 def _draw_main(d, ctx):
     ctx.topbar(d, 'SUB-GHZ')
+    _btn(ctx, d, (300, 3, 356, 25), '+ADD', (40, 58, 50), (150, 230, 180), ctx.F_SM)
     _btn(ctx, d, (362, 3, 472, 25), 'SAVED', (45, 52, 68), ctx.ACC, ctx.F_SM)
     # preset
     ctx.rr(d, (8, 32, 234, 62), fill=ctx.TILE, outline=ctx.LINE, w=1, r=6)
@@ -327,11 +413,23 @@ def _draw_main(d, ctx):
     ctx.lt(d, 248, 40, 'MOD  (tap)', ctx.F_TINY, ctx.DIM)
     ctx.ct(d, 356, 54, _prof, ctx.F_SM, (235, 180, 40))
     # waveform graph (center)
-    _draw_wave(d, ctx, (8, 66, 472, 176), _frame)
-    # stats
-    ctx.ct(d, 240, 193, 'RSSI %s   |   %d pulses   |   %d frames' % (
-        (_an_rssi if _an_rssi is not None else '--'), _pulses, _rec_frames),
-        ctx.F_SM, ctx.FG if _pulses else ctx.DIM)
+    _draw_wave(d, ctx, (8, 66, 472, 172), _frame, _decoded.te if _decoded else None)
+    # decode / stats strip (tap)
+    ctx.rr(d, (8, 176, 472, 204), fill=ctx.TILE, outline=ctx.LINE, w=1, r=6)
+    if _decoded is not None and _decoded.protocol != 'UNKNOWN':
+        ctx.ct(d, 240, 187, '%s   key %s   %db  te%d  x%d' % (
+            _decoded.protocol, _decoded.key_hex, _decoded.nbits,
+            _decoded.te or 0, _decoded.repeats),
+            ctx.F_SM, (90, 230, 140) if _dec_ok else ctx.ACC)
+        ctx.ct(d, 240, 198, ('VERIFIED - tap to EDIT key' if _dec_ok
+                             else (_decoded.note or 'tap to edit')[:46]),
+               ctx.F_TINY, ctx.DIM)
+    else:
+        ctx.ct(d, 240, 187, 'RSSI %s    |    %d pulses    |    %d frames' % (
+            (_an_rssi if _an_rssi is not None else '--'), _pulses, _rec_frames),
+            ctx.F_SM, ctx.FG if _pulses else ctx.DIM)
+        ctx.ct(d, 240, 198, ('tap to DECODE' if _frame else 'record a signal first'),
+               ctx.F_TINY, ctx.DIM)
     # action buttons
     busy = _busy
     _btn(ctx, d, (8, 208, 98, 250), 'SCAN', (120, 90, 200) if not busy else (60, 50, 90), (255, 255, 255), ctx.F_SM)
@@ -345,9 +443,17 @@ def _draw_main(d, ctx):
 
 
 def _touch_main(tx, ty, ctx):
-    global _view, _freq, _prof, _name
+    global _view, _freq, _prof, _name, _man_key
+    if ty <= 25 and 300 <= tx <= 356 and ctx.debounce(0.3):
+        _man_key = ''; _view = 'addman'; ctx.mark_dirty(); return
     if ty <= 25 and tx >= 362 and ctx.debounce(0.3):
         _refresh_saved(); _view = 'saved'; ctx.mark_dirty(); return
+    if 176 <= ty <= 204:                       # decode/stats strip
+        if _decoded is not None and _decoded.protocol == 'EV1527' and ctx.debounce(0.3):
+            _man_key = _decoded.key_hex; _view = 'addman'; ctx.mark_dirty()
+        elif _frame and ctx.debounce(0.5):
+            _spawn(ctx, _w_decode); ctx.mark_dirty()
+        return
     if 32 <= ty <= 62:
         if tx <= 234 and ctx.debounce(0.3):
             try: i = PRESETS.index(min(PRESETS, key=lambda p: abs(p - _freq)))
@@ -451,10 +557,72 @@ def _touch_savename(tx, ty, ctx):
                 ctx.mark_dirty()
 
 
+# ---------- view: ADD MANUALLY (hex keypad -> EV1527 encode) ----------
+def _draw_addman(d, ctx):
+    ctx.topbar(d, 'ADD MANUALLY')
+    _btn(ctx, d, (384, 3, 472, 25), 'MAIN', (45, 52, 68), ctx.ACC, ctx.F_SM)
+    # entry field
+    ctx.rr(d, (8, 32, 472, 66), fill=(8, 14, 22), outline=ctx.ACC, w=1, r=6)
+    ctx.lt(d, 16, 50, ('0x' + _man_key + '_') if _man_key else 'enter HEX key (EV1527, max 6 digits)...',
+           ctx.F_NM, ctx.FG if _man_key else ctx.DIM)
+    # meta: protocol (fixed) + freq (tap-cycle)
+    ctx.rr(d, (8, 72, 234, 100), fill=ctx.TILE, outline=ctx.LINE, w=1, r=6)
+    ctx.ct(d, 121, 86, 'EV1527 / 24-bit', ctx.F_SM, (235, 180, 40))
+    ctx.rr(d, (240, 72, 472, 100), fill=ctx.TILE, outline=ctx.LINE, w=1, r=6)
+    ctx.ct(d, 356, 86, '%.2f MHz  (tap)' % _freq, ctx.F_SM, ctx.ACC)
+    # hex keypad
+    ry = 106
+    for row in HEXKB:
+        for ci, ch in enumerate(row):
+            bx = 8 + ci * 46
+            ctx.rr(d, (bx, ry, bx + 44, ry + 36), fill=ctx.TILE, outline=ctx.LINE, w=1, r=5)
+            ctx.ct(d, bx + 22, ry + 18, ch, ctx.F_NM, ctx.FG)
+        ry += 40
+    # controls
+    cy = ry + 2
+    _btn(ctx, d, (8, cy, 116, cy + 34), 'DEL', (120, 70, 70), (255, 230, 230), ctx.F_SM)
+    _btn(ctx, d, (120, cy, 228, cy + 34), 'CLEAR', (90, 70, 45), (255, 235, 200), ctx.F_SM)
+    _btn(ctx, d, (232, cy, 350, cy + 34), 'CANCEL', (60, 66, 80), ctx.FG, ctx.F_SM)
+    _btn(ctx, d, (354, cy, 472, cy + 34), 'BUILD', (23, 150, 86), (240, 255, 246), ctx.F_SM)
+    ctx.ct(d, 240, cy + 50, _status[:54], ctx.F_SM, (235, 180, 40) if _busy else ctx.DIM)
+
+
+def _touch_addman(tx, ty, ctx):
+    global _man_key, _view, _freq
+    if ty <= 25 and tx >= 384 and ctx.debounce(0.3):
+        _view = 'main'; ctx.mark_dirty(); return
+    if 72 <= ty <= 100 and tx >= 240 and ctx.debounce(0.3):     # freq cycle
+        try: i = PRESETS.index(min(PRESETS, key=lambda p: abs(p - _freq)))
+        except Exception: i = 0
+        _freq = PRESETS[(i + 1) % len(PRESETS)]; ctx.mark_dirty(); return
+    ry = 106
+    for row in HEXKB:
+        if ry <= ty <= ry + 36:
+            ci = (tx - 8) // 46
+            if 0 <= ci < len(row) and ctx.debounce(0.12):
+                if len(_man_key) < 6:
+                    _man_key += row[ci]
+                ctx.mark_dirty()
+            return
+        ry += 40
+    cy = ry + 2
+    if cy <= ty <= cy + 34:
+        if tx <= 116:
+            if ctx.debounce(0.12): _man_key = _man_key[:-1]; ctx.mark_dirty()
+        elif tx <= 228:
+            if ctx.debounce(0.2): _man_key = ''; ctx.mark_dirty()
+        elif tx <= 350:
+            if ctx.debounce(0.3): _view = 'main'; ctx.mark_dirty()
+        else:
+            if ctx.debounce(0.3): _spawn(ctx, _w_addman); ctx.mark_dirty()
+
+
 # ---------- dispatch ----------
 def draw(d, ctx):
-    {'saved': _draw_saved, 'savename': _draw_savename}.get(_view, _draw_main)(d, ctx)
+    {'saved': _draw_saved, 'savename': _draw_savename,
+     'addman': _draw_addman}.get(_view, _draw_main)(d, ctx)
 
 
 def handle_touch(tx, ty, ctx):
-    {'saved': _touch_saved, 'savename': _touch_savename}.get(_view, _touch_main)(tx, ty, ctx)
+    {'saved': _touch_saved, 'savename': _touch_savename,
+     'addman': _touch_addman}.get(_view, _touch_main)(tx, ty, ctx)

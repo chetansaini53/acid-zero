@@ -25,8 +25,8 @@ This is a portfolio / proof-of-work project: **embedded systems and systems prog
 | Captive Portal Lab | rogue-AP + captive portal (demo; credential capture **off by default**) | ✅ Working |
 | Pwnagotchi mirror / Live Packets | live agent display / read-only 802.11 recon | ✅ Working |
 | Two-tier plugin runtime | in-process Python **+** native (C/C++/Rust/Go) plugins | ✅ Working |
-| Sub-GHz protocol decode | EV1527 / Princeton bit/key decode | 🚧 In progress |
-| Sub-GHz "Add Manually" | construct a signal from a known code | 🚧 In progress |
+| **Sub-GHz protocol decode** | EV1527 / Princeton 24-bit decode + round-trip verify; generic "PWM Nbit" fallback | ✅ **Working** |
+| **Sub-GHz "Add Manually"** | build a replayable EV1527 frame from a hex key, on-device | ✅ **Working** |
 | IR (transmit / receive) | capture + replay remotes, universal remote | 🚧 In progress |
 | NFC / RFID (PN532) | read / emulate tags (I2C) | 🗓️ Planned |
 
@@ -181,6 +181,17 @@ Each app is a screen in the UI.
 
 ---
 
+## 🧩 Custom Plugin Support (App Engine)
+
+Acid Zero is extensible — the launcher is a **plugin host**, not a fixed menu. Two ways to add apps, neither touching the core:
+
+- **UI apps (`.py`)** — drop a Python file into the plugin directory (`/usr/local/lib/acid-apps/`). Export a `META` dict plus `draw(d, ctx)` / `handle_touch(tx, ty, ctx)`; it's hot-discovered via `importlib`, slotted into the framebuffer state machine, and handed a `Ctx` facade of fonts/colors/draw helpers. *(The Sub-GHz app itself is exactly this — a single plugin file.)*
+- **Native apps (`app.json` + binary)** — ship a manifest and a compiled executable in **any** language (C / C++ / Rust / Go). It runs fullscreen via a blocking subprocess that takes ownership of the framebuffer + touch, then cleanly hands control back. Working template + contract: [`apps/hello-native/`](apps/hello-native/).
+
+**Extending the radio side:** the **ESP32 co-processor** firmware is open and reflashable — add a new sub-GHz/IR protocol handler in the `.ino`, reflash in one command ([`firmware/README.md`](firmware/README.md)), then drive it from a `.py` UI app over the serial protocol. The free **SPI1 / I²C-1** buses for new modules (CC1101, PN532, …) are mapped in [`docs/hardware-reference.pdf`](docs/hardware-reference.pdf).
+
+---
+
 ## Educational design
 
 Acid Zero is built to **teach**, not just to run attacks. Two features bake the
@@ -279,6 +290,9 @@ Full setup, flashing, overlay configuration, and service install are in **[INSTA
 ```
 launcher/acidzero.py                         # the ~1,500-line UI launcher
 apps/packets.py                              # in-process plugin example
+apps/subghz.py                               # Sub-GHz UI plugin (capture/decode/add-manually)
+apps/subghz_proto.py                         # OOK protocol codec (decode/encode/verify, pure)
+apps/test_subghz_proto.py                    # codec unit tests (20 cases, no radio needed)
 apps/hello-native/{app.json,hello.py}        # native-plugin template + contract
 lib/acid-ble/
   hci.py                                     # raw HCI socket layer
