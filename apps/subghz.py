@@ -350,6 +350,17 @@ def on_enter(ctx):
     ctx.mark_dirty()
 
 
+def on_exit(ctx):
+    """Release the shared ESP32 serial port so the IR app can claim it cleanly."""
+    global _sg
+    try:
+        if _sg is not None:
+            _sg.close()
+    except Exception:
+        pass
+    _sg = None
+
+
 # ---------- draw helpers ----------
 def _btn(ctx, d, box, label, fill, fg, font=None):
     ctx.rr(d, box, fill=fill, r=8)
