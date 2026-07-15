@@ -101,7 +101,7 @@ def ic_scaled(d,k,cx,cy,col,s=0.92):
     t=Image.new('RGBA',(60,60),(0,0,0,0)); td=ImageDraw.Draw(t)
     ic(td,k,30,30,col); n=max(1,int(60*s)); t=t.resize((n,n),Image.LANCZOS)
     d._image.paste(t,(int(cx-n/2),int(cy-n/2)),t)
-APPS=[('WiFi','wifi',(25,200,121)),('Radar','radar',(70,180,235)),('Handshake','key',(230,180,40)),('Evil AP','router',(235,130,55)),('BLE Spam','bt',(30,200,230)),('BLE Scan','bt',(70,130,235)),('Sub-GHz','radio',(175,125,235)),('NFC/RFID','wave',(235,70,150)),('IR Remote','remote',(235,130,55)),('Bad USB','usb',(30,200,121)),('Pwnagotchi','ghost',(30,200,230)),('Packets','net',(225,180,40)),('GPS','pin',(30,200,121)),('Settings','gear',(140,155,180)),('About','info',(140,155,180))]
+APPS=[('WiFi','wifi',(25,200,121)),('Radar','radar',(70,180,235)),('Handshake','key',(230,180,40)),('Evil AP','router',(235,130,55)),('BLE Spam','bt',(30,200,230)),('BLE Scan','bt',(70,130,235)),('Sub-GHz','radio',(175,125,235)),('NFC/RFID','wave',(235,70,150)),('IR Remote','remote',(235,130,55)),('Bad USB','usb',(30,200,121)),('Pwnagotchi','ghost',(30,200,230)),('Packets','net',(225,180,40)),('Wardrive','pin',(30,200,121)),('Settings','gear',(140,155,180)),('About','info',(140,155,180))]
 COLS=5; ROWS=3; GX=5; GY=98; CW=(W-10)/COLS; CH=(H-GY-22)/ROWS
 CAL_TARGETS=[(44,46),(436,46),(436,274),(44,274)]
 def memp():
@@ -470,6 +470,8 @@ LEARN['Radar:deauth']={'how':['Passively sniffs 802.11 deauth/disassoc frames on
          'defend':['WPA3-SAE + 802.11w PMF -> deauth cryptographically','ignored. On WPA2 it works, so treat sudden mass','disconnects as an attack signal. Prefer 5GHz / wired.']}
 LEARN['BLE Inspect']={'how':['Connects to a BLE device as a GATT client and','enumerates its services + characteristics (and a','few readable values: name, battery, maker).','Active - it makes a real connection, unlike Scan.'],
          'defend':['Require pairing/bonding + encryption on sensitive','characteristics (LE Secure Connections).','Don\'t leave device-info/credentials world-readable.','Use resolvable-private addresses + whitelists.']}
+LEARN['Wardrive']={'how':['Reads bettercap\'s existing AP scan (same feed','WiFi Hunter uses - no second scanner spawned)','and tags each sighting with GPS coordinates.','Read-only: it never transmits, cracks, or joins.'],
+         'defend':['This is standard site-survey / auditing practice.','Hide-SSID only deters casual discovery, not real','attackers. WPA3 protects the passphrase, not','whether the AP itself is visible on a public map.']}
 def draw_consent(d):
     d.rectangle((0,0,W,28),fill=BARBG); d.line([(0,28),(W,28)],fill=LINE)
     ct(d,W//2,15,'AUTHORIZED USE ONLY',F_TIT,(235,180,40))
@@ -890,7 +892,8 @@ def draw_settings(d):
     rr(d,(246,180,466,224),fill=TILE,outline=(70,130,235),w=2,r=12); ct(d,356,202,'System & Power',F_NM,(70,130,235))
     rr(d,(14,232,466,274),fill=TILE,outline=(30,200,121),w=2,r=12); ct(d,240,253,'WiFi / Radio Status',F_NM,(30,200,121))
     ct(d,240,288,'which adapter is SSH / monitor / AP  -  avoid breaking SSH',F_TINY,DIM)
-SVC=[('Pwnagotchi','pwnagotchi'),('Bluetooth','bluetooth'),('HS-Clean','acid-hs-clean.timer')]
+SVC=[('Pwnagotchi','pwnagotchi'),('Bluetooth','bluetooth'),('HS-Clean','acid-hs-clean.timer'),('HDMI Mirror','acid-hdmi-mirror')]
+SVC_YY=[36,66,96,126]   # row tops; draw_system() and the System touch handler share this
 svc_state={}
 def svc_refresh():
     for nm,u in SVC:
@@ -901,6 +904,19 @@ def svc_toggle(u):
     try: subprocess.Popen(['setsid','systemctl',act,u],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,stdin=subprocess.DEVNULL)
     except Exception: pass
     svc_state[u]='...'
+def hdmi_toggle():
+    # HDMI is a swap, not a single-unit toggle: ON = mirror the UI (console hidden),
+    # OFF = plain console back on HDMI (the default). Mirrors the hdmistart/hdmimirror aliases.
+    on=svc_state.get('acid-hdmi-mirror')=='active'
+    try:
+        if on:
+            subprocess.Popen(['setsid','systemctl','stop','acid-hdmi-mirror'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,stdin=subprocess.DEVNULL)
+            subprocess.Popen(['setsid','systemctl','start','getty@tty1'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,stdin=subprocess.DEVNULL)
+        else:
+            subprocess.Popen(['setsid','systemctl','stop','getty@tty1'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,stdin=subprocess.DEVNULL)
+            subprocess.Popen(['setsid','systemctl','start','acid-hdmi-mirror'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,stdin=subprocess.DEVNULL)
+    except Exception: pass
+    svc_state['acid-hdmi-mirror']='...'
 def restart_os():
     try: subprocess.Popen(['setsid','systemctl','restart','acidzero'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,stdin=subprocess.DEVNULL)
     except Exception: pass
@@ -910,18 +926,17 @@ def power_cmd(c):
 def draw_system(d):
     d.rectangle((0,0,W,28),fill=BARBG); d.line([(0,28),(W,28)],fill=LINE)
     rr(d,(6,4,92,24),outline=ACC,w=1,r=5); ct(d,49,15,'< back',F_SM,ACC); ct(d,W//2,15,'SYSTEM & POWER',F_TIT,FG)
-    yy=[36,70,104]
     for i,(nm,u) in enumerate(SVC):
-        y=yy[i]; st=svc_state.get(u,'?'); on=(st=='active')
+        y=SVC_YY[i]; st=svc_state.get(u,'?'); on=(st=='active')
         rr(d,(10,y,470,y+28),fill=TILE,outline=LINE,w=1,r=7)
         dot=(25,200,121) if on else (235,180,40) if st in ('...','activating','?') else (235,80,80)
         d.ellipse((20,y+9,30,y+19),fill=dot); lt(d,40,y+14,nm,F_NM,FG); lt(d,300,y+14,st,F_SM,DIM)
         rr(d,(384,y+4,462,y+24),fill=((235,80,80) if on else (25,160,90)),r=5); ct(d,423,y+14,('STOP' if on else 'START'),F_SM,(245,245,245))
-    rr(d,(10,138,470,168),fill=(30,120,210),r=8); ct(d,W//2,153,'RESTART ACID ZERO',F_NM,(240,248,255))
-    if sys_confirm=='reboot' and time.time()-sys_confirm_t<5: rr(d,(10,174,470,204),fill=(235,140,40),r=8); ct(d,W//2,189,'tap again to REBOOT',F_NM,(25,12,0))
-    else: rr(d,(10,174,470,204),outline=(235,140,40),w=2,r=8); ct(d,W//2,189,'REBOOT SYSTEM',F_NM,(235,140,40))
-    if sys_confirm=='shutdown' and time.time()-sys_confirm_t<5: rr(d,(10,210,470,240),fill=(220,60,60),r=8); ct(d,W//2,225,'tap again to SHUTDOWN',F_NM,(255,235,235))
-    else: rr(d,(10,210,470,240),outline=(220,60,60),w=2,r=8); ct(d,W//2,225,'SHUTDOWN',F_NM,(220,60,60))
+    rr(d,(10,162,470,192),fill=(30,120,210),r=8); ct(d,W//2,177,'RESTART ACID ZERO',F_NM,(240,248,255))
+    if sys_confirm=='reboot' and time.time()-sys_confirm_t<5: rr(d,(10,198,470,228),fill=(235,140,40),r=8); ct(d,W//2,213,'tap again to REBOOT',F_NM,(25,12,0))
+    else: rr(d,(10,198,470,228),outline=(235,140,40),w=2,r=8); ct(d,W//2,213,'REBOOT SYSTEM',F_NM,(235,140,40))
+    if sys_confirm=='shutdown' and time.time()-sys_confirm_t<5: rr(d,(10,234,470,264),fill=(220,60,60),r=8); ct(d,W//2,249,'tap again to SHUTDOWN',F_NM,(255,235,235))
+    else: rr(d,(10,234,470,264),outline=(220,60,60),w=2,r=8); ct(d,W//2,249,'SHUTDOWN',F_NM,(220,60,60))
 def draw_calibrate(d,step):
     ct(d,W//2,52,'TOUCH  CALIBRATION',F_TIT,ACC); ct(d,W//2,82,'tap each green target   (%d / 4)'%(min(step+1,4)),F_NM,FG)
     ct(d,W//2,150,'use stylus / nail, tap firmly on the +',F_SM,DIM); ct(d,W//2,175,'order: TL  ->  TR  ->  BR  ->  BL',F_SM,DIM)
@@ -1305,7 +1320,11 @@ while True:
                     elif screen=='BLE Inspect': screen='BLE Scan'
                     elif screen.startswith('Radar:'): radar_deauth_stop(); radar_blespam_stop(); radar_flipper_stop(); radar_all_stop(); screen='Radar'; radar_img=None
                     elif screen=='learn': screen=learn_topic
-                    else: screen='home'
+                    else:
+                        if screen in PLUGINS and hasattr(PLUGINS[screen],'on_exit'):
+                            try: PLUGINS[screen].on_exit(CTX)   # release serial port etc.
+                            except Exception: pass
+                        screen='home'
                 elif screen=='About' and 252<=ty<=286 and tx>=130:
                     if now-_last_act>0.4: _last_act=now; screen='HWInfo'; hwinfo_collect()
                 elif screen=='Settings' and 44<=ty<=166:
@@ -1321,18 +1340,23 @@ while True:
                     if now-_last_act>0.4: _last_act=now; wifi_status_scan()
                 elif screen=='System':
                     if now-_last_act>0.4:
-                        if 36<=ty<=64 and tx>=300: _last_act=now; sys_confirm=''; svc_toggle('pwnagotchi')
-                        elif 70<=ty<=98 and tx>=300: _last_act=now; sys_confirm=''; svc_toggle('bluetooth')
-                        elif 104<=ty<=132 and tx>=300: _last_act=now; sys_confirm=''; svc_toggle('acid-hs-clean.timer')
-                        elif 138<=ty<=168: _last_act=now; sys_confirm=''; restart_os()
-                        elif 174<=ty<=204:
-                            _last_act=now
-                            if sys_confirm=='reboot' and now-sys_confirm_t<5: power_cmd('reboot')
-                            else: sys_confirm='reboot'; sys_confirm_t=now
-                        elif 210<=ty<=240:
-                            _last_act=now
-                            if sys_confirm=='shutdown' and now-sys_confirm_t<5: power_cmd('poweroff')
-                            else: sys_confirm='shutdown'; sys_confirm_t=now
+                        hit=False
+                        for i,(nm,u) in enumerate(SVC):
+                            y=SVC_YY[i]
+                            if y<=ty<=y+28 and tx>=300:
+                                _last_act=now; sys_confirm=''
+                                hdmi_toggle() if u=='acid-hdmi-mirror' else svc_toggle(u)
+                                hit=True; break
+                        if not hit:
+                            if 162<=ty<=192: _last_act=now; sys_confirm=''; restart_os()
+                            elif 198<=ty<=228:
+                                _last_act=now
+                                if sys_confirm=='reboot' and now-sys_confirm_t<5: power_cmd('reboot')
+                                else: sys_confirm='reboot'; sys_confirm_t=now
+                            elif 234<=ty<=264:
+                                _last_act=now
+                                if sys_confirm=='shutdown' and now-sys_confirm_t<5: power_cmd('poweroff')
+                                else: sys_confirm='shutdown'; sys_confirm_t=now
                 elif screen=='WiFi':
                     view=wifi_view()
                     if wifi_confirm:
