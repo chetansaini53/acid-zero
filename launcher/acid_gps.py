@@ -152,11 +152,11 @@ class Gps:
 
     def _looks_like_nmea(self, port: str, baud: int) -> bool:
         try:
-            s = serial.Serial(port, baudrate=baud, timeout=1.0)
+            s = serial.Serial(port, baudrate=baud, timeout=0.3)
         except Exception:
             return False
         try:
-            for _ in range(15):
+            for _ in range(6):
                 raw = s.readline().decode('ascii', 'replace').strip()
                 # require an actual GPS sentence type (GGA/RMC), not just checksum-valid
                 # framing - a co-processor emitting unrelated "$..."-prefixed text on the

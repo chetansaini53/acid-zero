@@ -74,6 +74,56 @@ class TestGpsOptionalScanning(unittest.TestCase):
         finally:
             wardrive.Gps = orig
 
+    def test_failed_connect_is_cooled_down_not_retried_every_call(self):
+        """The bug this fixes: without a cooldown, a missing GPS forced a full
+        port/baud re-scan on every 5s poll, making the whole loop feel slow."""
+        class _FakeGpsAlwaysFails:
+            calls = 0
+            def __init__(self):
+                _FakeGpsAlwaysFails.calls += 1
+                raise Exception('no GPS wired')
+            def start(self): pass
+        orig = (wardrive.Gps, wardrive._gps_last_attempt, wardrive._gps_retry_cooldown, wardrive._gps_connecting)
+        try:
+            wardrive.Gps = _FakeGpsAlwaysFails
+            wardrive._gps_last_attempt = 0.0
+            wardrive._gps_retry_cooldown = 9999.0   # effectively "never retry within this test"
+            wardrive._gps_connecting = False
+            self.assertFalse(wardrive._ensure_gps())
+            time.sleep(0.1)                          # let the spawned bg thread actually run
+            self.assertEqual(_FakeGpsAlwaysFails.calls, 1)   # first call actually tries
+            self.assertFalse(wardrive._ensure_gps())
+            self.assertFalse(wardrive._ensure_gps())
+            time.sleep(0.05)
+            self.assertEqual(_FakeGpsAlwaysFails.calls, 1)   # cooled down - no retry yet
+        finally:
+            wardrive.Gps, wardrive._gps_last_attempt, wardrive._gps_retry_cooldown, wardrive._gps_connecting = orig
+
+    def test_ensure_gps_never_blocks_even_if_connect_hangs(self):
+        """The REAL bug found live: a wedged serial port made Gps()/.start()
+        hang, and because _ensure_gps() used to call that synchronously inside
+        _log_loop, the ENTIRE wardrive scan froze for 30+ minutes even though
+        bettercap itself was working fine the whole time. _ensure_gps() must
+        return near-instantly no matter how long (or whether ever) the
+        connect attempt it kicks off in the background actually finishes."""
+        class _FakeGpsHangsForever:
+            def __init__(self):
+                time.sleep(5.0)   # simulates a wedged serial.Serial() open()
+            def start(self): pass
+        orig = (wardrive.Gps, wardrive._gps_last_attempt, wardrive._gps_retry_cooldown, wardrive._gps_connecting)
+        try:
+            wardrive.Gps = _FakeGpsHangsForever
+            wardrive._gps_last_attempt = 0.0
+            wardrive._gps_retry_cooldown = 9999.0
+            wardrive._gps_connecting = False
+            t0 = time.time()
+            result = wardrive._ensure_gps()
+            elapsed = time.time() - t0
+            self.assertFalse(result)
+            self.assertLess(elapsed, 1.0, 'ensure_gps() must not block on a hanging connect attempt')
+        finally:
+            wardrive.Gps, wardrive._gps_last_attempt, wardrive._gps_retry_cooldown, wardrive._gps_connecting = orig
+
     def test_bc_scan_returns_empty_not_exception_when_unreachable(self):
         orig = wardrive.BC_URL
         try:

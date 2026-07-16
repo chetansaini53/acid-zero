@@ -54,19 +54,50 @@ _thread = None
 _lock = threading.Lock()
 
 
+_gps_last_attempt = 0.0
+_gps_retry_cooldown = 20.0   # don't re-scan all ports/bauds every 5s poll if GPS isn't found
+_gps_connecting = False       # guards against spawning overlapping reconnect attempts
+
+
+def _gps_connect_bg():
+    """Runs the actual (potentially slow, or - if a port is wedged by some
+    other process - genuinely HUNG) connect attempt in its own thread. pyserial
+    has no way to bound how long serial.Serial(...)'s open() itself can block
+    if the underlying device is locked/contended; this must never be called
+    from _log_loop directly, or a single stuck port silently freezes the
+    entire wardrive scan (this happened for real: a leftover diagnostic
+    process holding /dev/ttyUSB0 open blocked the whole loop for 30+ minutes
+    with bettercap itself working perfectly fine the entire time)."""
+    global _gps, _gps_connecting
+    try:
+        g = Gps()
+        g.start()
+        with _gps_lock:
+            _gps = g
+    except Exception:
+        pass
+    finally:
+        _gps_connecting = False
+
+
 def _ensure_gps():
-    """Best-effort GPS connect. Returns False if absent/not wired yet - the
-    caller treats that as 'scan-only, no location tag' rather than an error."""
-    global _gps
+    """Non-blocking: returns the CURRENT GPS-ready state immediately and, if
+    not connected, kicks off a rate-limited background reconnect attempt
+    without waiting for it. Never blocks the caller, however long (or never)
+    the underlying port open/probe takes."""
+    global _gps_last_attempt, _gps_connecting
     if Gps is None:
         return False
-    with _gps_lock:               # guards the check-then-construct against a racing thread
+    with _gps_lock:
         if _gps is not None and _gps.connected:
             return True
-        try:
-            _gps = Gps(); _gps.start(); return True
-        except Exception:
-            _gps = None; return False
+    now = time.time()
+    if _gps_connecting or (now - _gps_last_attempt < _gps_retry_cooldown):
+        return False
+    _gps_last_attempt = now
+    _gps_connecting = True
+    threading.Thread(target=_gps_connect_bg, daemon=True).start()
+    return False
 
 
 def _bc_scan():
