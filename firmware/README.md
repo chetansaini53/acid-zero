@@ -1,22 +1,53 @@
-# Acid Zero — ESP32 Sub-GHz Co-Processor (CC1101)
+# Acid Zero — ESP32 Sub-GHz + IR Co-Processor
 
-This folder is the **radio brain** of Acid Zero. The Raspberry Pi owns the UI; a dedicated
-**ESP32-WROOM-32** owns the **CC1101** sub-GHz transceiver and talks to the Pi over **USB
-serial @ 115200**. Moving the radio off the Pi is deliberate — raw OOK timing needs the
-ESP32's **RMT peripheral** for microsecond-precise edge capture, which a preempted Linux
-userspace process cannot guarantee. See [`../ARCHITECTURE.md`](../ARCHITECTURE.md) for the
-full rationale.
+This folder is the **radio/IR brain** of Acid Zero. The Raspberry Pi owns the UI; a dedicated
+ESP32 owns the **CC1101** sub-GHz transceiver and the **IR** transmitter/receiver, and talks
+to the Pi over **USB serial @ 115200**. Moving these off the Pi is deliberate — raw OOK/IR
+timing needs the ESP32's **RMT peripheral** for microsecond-precise edge capture, which a
+preempted Linux userspace process cannot guarantee. See
+[`../ARCHITECTURE.md`](../ARCHITECTURE.md) for the full rationale.
+
+> **Current board: `esp32-allinone/`** — CC1101 + IR merged onto ONE 38-pin ESP32-D0WD-V3
+> (NodeMCU-32S) board, one USB cable to the Pi. Every pin and every serial command is a
+> straight, unchanged merge of `esp32-cc1101/` + `esp32-ir/` (see those folders' headers for
+> the original, still-valid per-command docs) — both existing Pi-side clients
+> (`acid_subghz.py`, `acid_ir.py`) work against it with zero code changes, since they detect
+> their board by different probe commands (`PING`→`PONG` vs `IR_INFO`), not by which physical
+> ESP32 answers. Full pin reference: [`../docs/pinout-esp32-allinone.svg`](../docs/pinout-esp32-allinone.svg).
+> GPS is **not** on this board — wire it straight to the Pi's own GPIO14/15 UART instead (see
+> [`../launcher/acid_gps.py`](../launcher/acid_gps.py)).
+>
+> `esp32-cc1101/` and `esp32-ir/` (two separate boards) are kept as historical/fallback
+> reference — safe to still flash+run separately if you ever need to split them again.
 
 ```
 firmware/
-├── esp32-cc1101/
-│   ├── esp32-cc1101.ino                 # the firmware source (build from this)
+├── esp32-allinone/                      # CURRENT: CC1101 + IR, one 38-pin board
+│   ├── esp32-allinone.ino               # the firmware source (build from this)
 │   └── prebuilt/
-│       └── esp32-cc1101.merged.bin      # ready-to-flash image (flash at 0x0)
-├── flash-windows.bat                    # one-command flash (Windows)
-├── flash-pi.sh                          # one-command flash (Raspberry Pi / Linux)
+│       └── esp32-allinone.merged.bin    # ready-to-flash image (flash at 0x0)
+├── esp32-cc1101/                        # legacy: CC1101-only, standalone board
+│   ├── esp32-cc1101.ino
+│   └── prebuilt/esp32-cc1101.merged.bin
+├── esp32-ir/                            # legacy: IR-only, standalone board
+│   └── esp32-ir.ino
+├── flash-allinone-windows.bat           # one-command flash, all-in-one board (Windows)
+├── flash-allinone-pi.sh                 # one-command flash, all-in-one board (Pi/Linux)
+├── flash-windows.bat                    # one-command flash, legacy CC1101-only (Windows)
+├── flash-pi.sh                          # one-command flash, legacy CC1101-only (Pi/Linux)
 └── README.md                            # this file
 ```
+
+Everything below documents the **CC1101 half** in depth (wiring, commands, modulation
+profiles) — it applies identically whether you're running `esp32-cc1101/` alone or
+`esp32-allinone/`, since the pins and commands are unchanged. For the **IR half**'s commands
+(`IR_INFO` / `IR_RX` / `IR_TX_RAW`), see the header comment in
+[`esp32-ir/esp32-ir.ino`](esp32-ir/esp32-ir.ino) or
+[`esp32-allinone/esp32-allinone.ino`](esp32-allinone/esp32-allinone.ino) — same commands,
+unchanged. To flash the **all-in-one** board, swap `flash-windows.bat`/`flash-pi.sh` for
+`flash-allinone-windows.bat`/`flash-allinone-pi.sh` in the steps below, and build/upload the
+`esp32-allinone` sketch instead of `esp32-cc1101` (same `arduino-cli` commands, different
+folder name) — also install `IRremoteESP8266 >= 2.8.6` alongside `SmartRC-CC1101-Driver-Lib`.
 
 ---
 
