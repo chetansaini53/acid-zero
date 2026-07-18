@@ -1,24 +1,25 @@
 <svg viewBox="0 0 1000 900" xmlns="http://www.w3.org/2000/svg" role="img" font-family="Segoe UI, Roboto, Arial, sans-serif">
 <title>ESP32 38-pin all-in-one co-processor pinout — CC1101 + IR</title>
-<desc>NodeMCU-32S (ESP32-D0WD-V3, 38-pin) wired as a single Sub-GHz/IR co-processor for Acid Zero: CC1101 on GDO0=D4, CSN=D5, SCK=D18, MOSI=D19, MISO=D23 (matches committed firmware/esp32-cc1101). IR TX=D13, RX=D14 (matches committed firmware/esp32-ir). The ESP32 talks to the Raspberry Pi over its own USB cable (/dev/ttyUSB* or /dev/ttyACM*, same as the existing CC1101 and IR firmware) - no GPIO wiring to the Pi is needed. GPS is NOT on this board - it wires directly to the Pi's own UART (GPIO14/15, /dev/serial0), matching the already-written launcher/acid_gps.py client. Flash pins CLK/SDD/SD1/SD2/SD3 and strapping pins P0/P2/P15/P12 and USB0 RX/TX are reserved - never wire anything to them.</desc>
+<desc>NodeMCU-32S (ESP32-D0WD-V3, 38-pin) wired as a single Sub-GHz/IR co-processor for Acid Zero. Board shown with the USB connector at the TOP (matching how the board is held: CLK is the top-left pin, 5V the top-right). CC1101 on GDO0=D4, CSN=D5, SCK=D18, MOSI=D19, MISO=D23 (matches committed firmware/esp32-cc1101). IR TX=D13, RX=D14 (matches committed firmware/esp32-ir). The ESP32 talks to the Raspberry Pi over its own USB cable (/dev/ttyUSB* or /dev/ttyACM*). GPS is NOT on this board - it wires to the Pi's own UART (GPIO14/15, /dev/serial0), see launcher/acid_gps.py. Flash pins CLK/SD0/SD1/SD2/SD3/CMD, strapping pins P0/P2/P15/P12, and USB0 RX/TX are reserved - never wire signals to them. GPIO34/35/36(SVP)/39(SVN) are input-only.</desc>
 <rect x="0" y="0" width="1000" height="900" rx="14" fill="#0e1525"/>
 <text x="500" y="38" text-anchor="middle" fill="#e8eef7" font-size="24" font-weight="700">ESP32 38-pin — All-in-One CC1101 + IR Co-Processor</text>
 <text x="500" y="60" text-anchor="middle" fill="#8a97ab" font-size="13">Acid Zero · NodeMCU-32S (ESP32-D0WD-V3) · one board, one USB cable to the Pi · GPS is separate (Pi's own UART)</text>
 
 <!-- ============ board ============ -->
 <rect x="430" y="136" width="140" height="494" rx="10" fill="#16181d" stroke="#30343f" stroke-width="2"/>
-<text x="500" y="360" text-anchor="middle" fill="#aab3c2" font-size="14" font-weight="600">ESP32</text>
-<text x="500" y="378" text-anchor="middle" fill="#7c8696" font-size="11">D0WD-V3</text>
-<text x="500" y="396" text-anchor="middle" fill="#5a6270" font-size="10">NodeMCU-32S · 38-pin</text>
+<text x="500" y="356" text-anchor="middle" fill="#aab3c2" font-size="14" font-weight="600">ESP32</text>
+<text x="500" y="374" text-anchor="middle" fill="#7c8696" font-size="11">D0WD-V3</text>
+<text x="500" y="392" text-anchor="middle" fill="#5a6270" font-size="10">NodeMCU-32S · 38-pin</text>
 <rect x="466" y="150" width="68" height="20" rx="3" fill="#9aa1ad"/>
 <text x="500" y="164" text-anchor="middle" fill="#2a2e36" font-size="9" font-weight="700">USB → Pi</text>
+<text x="500" y="186" text-anchor="middle" fill="#5a6270" font-size="9">(USB at top)</text>
 
-<!-- ============ LEFT column (19 pins, top to bottom as on the physical board) ============ -->
+<!-- ============ LEFT column (19 pins, USB at top -> CLK top ... GND bottom) ============ -->
 <g font-size="13">
 <!-- row0 CLK -->
 <text x="60" y="152" fill="#5a6270" font-size="11">flash (reserved)</text><rect x="330" y="142" width="14" height="12" rx="2" fill="#3a3f49"/><text x="352" y="152" fill="#6b7585" font-size="11">CLK</text>
-<!-- row1 SDD -->
-<text x="60" y="178" fill="#5a6270" font-size="11">flash (reserved)</text><rect x="330" y="168" width="14" height="12" rx="2" fill="#3a3f49"/><text x="352" y="178" fill="#6b7585" font-size="11">SDD</text>
+<!-- row1 SD0 -->
+<text x="60" y="178" fill="#5a6270" font-size="11">flash (reserved)</text><rect x="330" y="168" width="14" height="12" rx="2" fill="#3a3f49"/><text x="352" y="178" fill="#6b7585" font-size="11">SD0</text>
 <!-- row2 SD1 -->
 <text x="60" y="204" fill="#5a6270" font-size="11">flash (reserved)</text><rect x="330" y="194" width="14" height="12" rx="2" fill="#3a3f49"/><text x="352" y="204" fill="#6b7585" font-size="11">SD1</text>
 <!-- row3 P15 -->
@@ -43,10 +44,10 @@
 <text x="60" y="464" fill="#cfd7e3">GND</text><rect x="330" y="454" width="14" height="12" rx="2" fill="#9aa4b2"/><text x="352" y="464" fill="#cfd7e3">GND</text>
 <!-- row13 P21 free -->
 <text x="60" y="490" fill="#4a5262" font-size="11">free / spare</text><rect x="330" y="480" width="14" height="12" rx="2" fill="#242833"/><text x="352" y="490" fill="#4a5262" font-size="11">P21</text>
-<!-- row14 RX (U0RXD) -->
-<text x="60" y="516" fill="#5a6270" font-size="11">USB flash/debug (U0RXD)</text><rect x="330" y="506" width="14" height="12" rx="2" fill="#3a3f49"/><text x="352" y="516" fill="#6b7585" font-size="11">RX</text>
-<!-- row15 TX (U0TXD) -->
-<text x="60" y="542" fill="#5a6270" font-size="11">USB flash/debug (U0TXD)</text><rect x="330" y="532" width="14" height="12" rx="2" fill="#3a3f49"/><text x="352" y="542" fill="#6b7585" font-size="11">TX</text>
+<!-- row14 RX (U0RXD, GPIO3) -->
+<text x="60" y="516" fill="#5a6270" font-size="11">USB flash/debug (U0RXD=GPIO3)</text><rect x="330" y="506" width="14" height="12" rx="2" fill="#3a3f49"/><text x="352" y="516" fill="#6b7585" font-size="11">RX</text>
+<!-- row15 TX (U0TXD, GPIO1) -->
+<text x="60" y="542" fill="#5a6270" font-size="11">USB flash/debug (U0TXD=GPIO1)</text><rect x="330" y="532" width="14" height="12" rx="2" fill="#3a3f49"/><text x="352" y="542" fill="#6b7585" font-size="11">TX</text>
 <!-- row16 P22 free -->
 <text x="60" y="568" fill="#4a5262" font-size="11">free / spare</text><rect x="330" y="558" width="14" height="12" rx="2" fill="#242833"/><text x="352" y="568" fill="#4a5262" font-size="11">P22</text>
 <!-- row17 P23 -> CC1101 MISO -->
@@ -55,46 +56,46 @@
 <text x="60" y="620" fill="#cfd7e3">GND</text><rect x="330" y="610" width="14" height="12" rx="2" fill="#9aa4b2"/><text x="352" y="620" fill="#cfd7e3">GND</text>
 </g>
 
-<!-- ============ RIGHT column (19 pins, top to bottom as on the physical board) ============ -->
+<!-- ============ RIGHT column (19 pins, USB at top -> 5V top ... 3V3 bottom) ============ -->
 <g font-size="13">
-<!-- row0 3V3 -->
-<text x="940" y="152" text-anchor="end" fill="#e8eef7" font-weight="700">Power 3V3 → all modules</text><rect x="656" y="142" width="14" height="12" rx="2" fill="#ff5a5a"/><text x="648" y="152" text-anchor="end" fill="#e8eef7" font-weight="700">3V3</text>
-<!-- row1 EN -->
-<text x="940" y="178" text-anchor="end" fill="#5a6270" font-size="11">reset / enable</text><rect x="656" y="168" width="14" height="12" rx="2" fill="#3a3f49"/><text x="648" y="178" text-anchor="end" fill="#6b7585" font-size="11">EN</text>
-<!-- row2 S38 free -->
-<text x="940" y="204" text-anchor="end" fill="#4a5262" font-size="11">free / spare (input-only)</text><rect x="656" y="194" width="14" height="12" rx="2" fill="#242833"/><text x="648" y="204" text-anchor="end" fill="#4a5262" font-size="11">S38</text>
-<!-- row3 S39 free -->
-<text x="940" y="230" text-anchor="end" fill="#4a5262" font-size="11">free / spare (input-only)</text><rect x="656" y="220" width="14" height="12" rx="2" fill="#242833"/><text x="648" y="230" text-anchor="end" fill="#4a5262" font-size="11">S39</text>
-<!-- row4 S34 free -->
-<text x="940" y="256" text-anchor="end" fill="#4a5262" font-size="11">free / spare (input-only)</text><rect x="656" y="246" width="14" height="12" rx="2" fill="#242833"/><text x="648" y="256" text-anchor="end" fill="#4a5262" font-size="11">S34</text>
-<!-- row5 S35 free -->
-<text x="940" y="282" text-anchor="end" fill="#4a5262" font-size="11">free / spare (input-only)</text><rect x="656" y="272" width="14" height="12" rx="2" fill="#242833"/><text x="648" y="282" text-anchor="end" fill="#4a5262" font-size="11">S35</text>
-<!-- row6 P32 free -->
-<text x="940" y="308" text-anchor="end" fill="#4a5262" font-size="11">free / spare</text><rect x="656" y="298" width="14" height="12" rx="2" fill="#242833"/><text x="648" y="308" text-anchor="end" fill="#4a5262" font-size="11">P32</text>
-<!-- row7 P33 free -->
-<text x="940" y="334" text-anchor="end" fill="#4a5262" font-size="11">free / spare</text><rect x="656" y="324" width="14" height="12" rx="2" fill="#242833"/><text x="648" y="334" text-anchor="end" fill="#4a5262" font-size="11">P33</text>
-<!-- row8 P25 free -->
-<text x="940" y="360" text-anchor="end" fill="#4a5262" font-size="11">free / spare</text><rect x="656" y="350" width="14" height="12" rx="2" fill="#242833"/><text x="648" y="360" text-anchor="end" fill="#4a5262" font-size="11">P25</text>
+<!-- row0 5V -->
+<text x="940" y="152" text-anchor="end" fill="#e8eef7" font-weight="700">5V IN (USB)</text><rect x="656" y="142" width="14" height="12" rx="2" fill="#ff5a5a"/><text x="648" y="152" text-anchor="end" fill="#e8eef7" font-weight="700">5V</text>
+<!-- row1 CMD -->
+<text x="940" y="178" text-anchor="end" fill="#5a6270" font-size="11">flash (reserved)</text><rect x="656" y="168" width="14" height="12" rx="2" fill="#3a3f49"/><text x="648" y="178" text-anchor="end" fill="#6b7585" font-size="11">CMD</text>
+<!-- row2 SD3 -->
+<text x="940" y="204" text-anchor="end" fill="#5a6270" font-size="11">flash (reserved)</text><rect x="656" y="194" width="14" height="12" rx="2" fill="#3a3f49"/><text x="648" y="204" text-anchor="end" fill="#6b7585" font-size="11">SD3</text>
+<!-- row3 SD2 -->
+<text x="940" y="230" text-anchor="end" fill="#5a6270" font-size="11">flash (reserved)</text><rect x="656" y="220" width="14" height="12" rx="2" fill="#3a3f49"/><text x="648" y="230" text-anchor="end" fill="#6b7585" font-size="11">SD2</text>
+<!-- row4 P13 -> IR TX -->
+<text x="940" y="256" text-anchor="end" fill="#e8eef7" font-weight="700">IR TX → LED driver</text><rect x="656" y="246" width="14" height="12" rx="2" fill="#ff8a3d"/><text x="648" y="256" text-anchor="end" fill="#e8eef7" font-weight="700">P13</text>
+<!-- row5 GND -->
+<text x="940" y="282" text-anchor="end" fill="#cfd7e3">GND</text><rect x="656" y="272" width="14" height="12" rx="2" fill="#9aa4b2"/><text x="648" y="282" text-anchor="end" fill="#cfd7e3">GND</text>
+<!-- row6 P12 -->
+<text x="940" y="308" text-anchor="end" fill="#4a5262" font-size="11">free (strap-caution)</text><rect x="656" y="298" width="14" height="12" rx="2" fill="#242833"/><text x="648" y="308" text-anchor="end" fill="#4a5262" font-size="11">P12</text>
+<!-- row7 P14 -> IR RX -->
+<text x="940" y="334" text-anchor="end" fill="#e8eef7" font-weight="700">IR RX ← TSOP OUT</text><rect x="656" y="324" width="14" height="12" rx="2" fill="#c96426"/><text x="648" y="334" text-anchor="end" fill="#e8eef7" font-weight="700">P14</text>
+<!-- row8 P27 free -->
+<text x="940" y="360" text-anchor="end" fill="#4a5262" font-size="11">free / spare</text><rect x="656" y="350" width="14" height="12" rx="2" fill="#242833"/><text x="648" y="360" text-anchor="end" fill="#4a5262" font-size="11">P27</text>
 <!-- row9 P26 free -->
 <text x="940" y="386" text-anchor="end" fill="#4a5262" font-size="11">free / spare</text><rect x="656" y="376" width="14" height="12" rx="2" fill="#242833"/><text x="648" y="386" text-anchor="end" fill="#4a5262" font-size="11">P26</text>
-<!-- row10 P27 free -->
-<text x="940" y="412" text-anchor="end" fill="#4a5262" font-size="11">free / spare</text><rect x="656" y="402" width="14" height="12" rx="2" fill="#242833"/><text x="648" y="412" text-anchor="end" fill="#4a5262" font-size="11">P27</text>
-<!-- row11 P14 -> IR RX -->
-<text x="940" y="438" text-anchor="end" fill="#e8eef7" font-weight="700">IR RX ← TSOP OUT</text><rect x="656" y="428" width="14" height="12" rx="2" fill="#c96426"/><text x="648" y="438" text-anchor="end" fill="#e8eef7" font-weight="700">P14</text>
-<!-- row12 P12 -->
-<text x="940" y="464" text-anchor="end" fill="#4a5262" font-size="11">free (strap-caution)</text><rect x="656" y="454" width="14" height="12" rx="2" fill="#242833"/><text x="648" y="464" text-anchor="end" fill="#4a5262" font-size="11">P12</text>
-<!-- row13 GND -->
-<text x="940" y="490" text-anchor="end" fill="#cfd7e3">GND</text><rect x="656" y="480" width="14" height="12" rx="2" fill="#9aa4b2"/><text x="648" y="490" text-anchor="end" fill="#cfd7e3">GND</text>
-<!-- row14 P13 -> IR TX -->
-<text x="940" y="516" text-anchor="end" fill="#e8eef7" font-weight="700">IR TX → LED driver</text><rect x="656" y="506" width="14" height="12" rx="2" fill="#ff8a3d"/><text x="648" y="516" text-anchor="end" fill="#e8eef7" font-weight="700">P13</text>
-<!-- row15 SD2 -->
-<text x="940" y="542" text-anchor="end" fill="#5a6270" font-size="11">flash (reserved)</text><rect x="656" y="532" width="14" height="12" rx="2" fill="#3a3f49"/><text x="648" y="542" text-anchor="end" fill="#6b7585" font-size="11">SD2</text>
-<!-- row16 SD3 -->
-<text x="940" y="568" text-anchor="end" fill="#5a6270" font-size="11">flash (reserved)</text><rect x="656" y="558" width="14" height="12" rx="2" fill="#3a3f49"/><text x="648" y="568" text-anchor="end" fill="#6b7585" font-size="11">SD3</text>
-<!-- row17 GND -->
-<text x="940" y="594" text-anchor="end" fill="#cfd7e3">GND</text><rect x="656" y="584" width="14" height="12" rx="2" fill="#9aa4b2"/><text x="648" y="594" text-anchor="end" fill="#cfd7e3">GND</text>
-<!-- row18 5V -->
-<text x="940" y="620" text-anchor="end" fill="#e8eef7" font-weight="700">5V IN (USB)</text><rect x="656" y="610" width="14" height="12" rx="2" fill="#ff5a5a"/><text x="648" y="620" text-anchor="end" fill="#e8eef7" font-weight="700">5V</text>
+<!-- row10 P25 free -->
+<text x="940" y="412" text-anchor="end" fill="#4a5262" font-size="11">free / spare</text><rect x="656" y="402" width="14" height="12" rx="2" fill="#242833"/><text x="648" y="412" text-anchor="end" fill="#4a5262" font-size="11">P25</text>
+<!-- row11 P33 free -->
+<text x="940" y="438" text-anchor="end" fill="#4a5262" font-size="11">free / spare</text><rect x="656" y="428" width="14" height="12" rx="2" fill="#242833"/><text x="648" y="438" text-anchor="end" fill="#4a5262" font-size="11">P33</text>
+<!-- row12 P32 free -->
+<text x="940" y="464" text-anchor="end" fill="#4a5262" font-size="11">free / spare</text><rect x="656" y="454" width="14" height="12" rx="2" fill="#242833"/><text x="648" y="464" text-anchor="end" fill="#4a5262" font-size="11">P32</text>
+<!-- row13 P35 input-only -->
+<text x="940" y="490" text-anchor="end" fill="#4a5262" font-size="11">free · input-only</text><rect x="656" y="480" width="14" height="12" rx="2" fill="#242833"/><text x="648" y="490" text-anchor="end" fill="#4a5262" font-size="11">P35</text>
+<!-- row14 P34 input-only -->
+<text x="940" y="516" text-anchor="end" fill="#4a5262" font-size="11">free · input-only</text><rect x="656" y="506" width="14" height="12" rx="2" fill="#242833"/><text x="648" y="516" text-anchor="end" fill="#4a5262" font-size="11">P34</text>
+<!-- row15 SVN = GPIO39 input-only -->
+<text x="940" y="542" text-anchor="end" fill="#4a5262" font-size="11">GPIO39 · input-only</text><rect x="656" y="532" width="14" height="12" rx="2" fill="#242833"/><text x="648" y="542" text-anchor="end" fill="#4a5262" font-size="11">SVN</text>
+<!-- row16 SVP = GPIO36 input-only -->
+<text x="940" y="568" text-anchor="end" fill="#4a5262" font-size="11">GPIO36 · input-only</text><rect x="656" y="558" width="14" height="12" rx="2" fill="#242833"/><text x="648" y="568" text-anchor="end" fill="#4a5262" font-size="11">SVP</text>
+<!-- row17 EN -->
+<text x="940" y="594" text-anchor="end" fill="#5a6270" font-size="11">reset / enable</text><rect x="656" y="584" width="14" height="12" rx="2" fill="#3a3f49"/><text x="648" y="594" text-anchor="end" fill="#6b7585" font-size="11">EN</text>
+<!-- row18 3V3 -->
+<text x="940" y="620" text-anchor="end" fill="#e8eef7" font-weight="700">Power 3V3 → all modules</text><rect x="656" y="610" width="14" height="12" rx="2" fill="#ff5a5a"/><text x="648" y="620" text-anchor="end" fill="#e8eef7" font-weight="700">3V3</text>
 </g>
 
 <!-- ============ legend ============ -->
