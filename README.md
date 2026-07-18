@@ -27,8 +27,8 @@ This is a portfolio / proof-of-work project: **embedded systems and systems prog
 | Two-tier plugin runtime | in-process Python **+** native (C/C++/Rust/Go) plugins | ✅ Working |
 | **Sub-GHz protocol decode** | EV1527 / Princeton 24-bit decode + round-trip verify; generic "PWM Nbit" fallback | ✅ **Working** |
 | **Sub-GHz "Add Manually"** | build a replayable EV1527 frame from a hex key, on-device | ✅ **Working** |
-| IR (transmit / receive) | capture + replay remotes, universal remote | 🚧 In progress |
-| NFC / RFID (PN532) | read / emulate tags (I2C) | 🗓️ Planned |
+| **IR** (transmit / receive) | capture + **raw replay** (works with AC remotes too) · Flipper-style Remotes/Buttons library · `.ir` file interop · on the same ESP32 co-processor | ✅ **Working** |
+| NFC / RFID (PN532) | read / emulate tags — PN532 over I²C (code already probes `i2c-1 @0x24`) | 🗓️ Planned |
 
 > The Sub-GHz radio runs on a dedicated **ESP32 co-processor** (CC1101) talking to the Pi over USB serial — hardware-precise RMT capture, modulation-aware record/replay, all driven from the on-device touch UI. The ESP32 firmware (source **+ a ready-to-flash binary**) ships in [`firmware/`](firmware/) — flash it in one command.
 
