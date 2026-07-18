@@ -1,79 +1,105 @@
-<svg viewBox="0 0 1000 560" xmlns="http://www.w3.org/2000/svg" role="img" font-family="Segoe UI, Roboto, Arial, sans-serif">
-<title>Acid Zero architecture — Pi client to CC1101 over an ESP32 co-processor</title>
-<desc>Raspberry Pi Python launcher (framebuffer UI) talks over USB serial to an ESP32 co-processor, which drives a CC1101 sub-GHz transceiver over SPI; the RF goes out an SMA antenna.</desc>
-<rect x="0" y="0" width="1000" height="560" rx="14" fill="#0e1525"/>
-<text x="500" y="40" text-anchor="middle" fill="#e8eef7" font-size="25" font-weight="700">Acid Zero — System Architecture</text>
-<text x="500" y="64" text-anchor="middle" fill="#8a97ab" font-size="14">UI brain on the Pi · radio brain on a dedicated ESP32 co-processor (the Flipper pattern)</text>
+<svg viewBox="0 0 1040 620" xmlns="http://www.w3.org/2000/svg" role="img" font-family="Segoe UI, Roboto, Arial, sans-serif">
+<title>Acid Zero architecture — Pi client to CC1101 + IR over one ESP32 co-processor</title>
+<desc>Raspberry Pi Python launcher (framebuffer UI) talks over USB serial to a single ESP32 co-processor, which drives BOTH a CC1101 sub-GHz transceiver over SPI and an IR transmitter/receiver over GPIO. The Pi also reads a USB u-blox GPS directly. RF goes out an SMA antenna; IR out a 38 kHz LED.</desc>
+<rect x="0" y="0" width="1040" height="620" rx="14" fill="#0e1525"/>
+<text x="520" y="40" text-anchor="middle" fill="#e8eef7" font-size="25" font-weight="700">Acid Zero — System Architecture</text>
+<text x="520" y="64" text-anchor="middle" fill="#8a97ab" font-size="14">UI brain on the Pi · one ESP32 co-processor drives BOTH CC1101 (Sub-GHz) and IR (the Flipper pattern)</text>
 
 <!-- ============ Raspberry Pi ============ -->
-<rect x="40" y="92" width="300" height="404" rx="12" fill="#15171c" stroke="#a23b3b" stroke-width="2"/>
+<rect x="40" y="92" width="300" height="430" rx="12" fill="#15171c" stroke="#a23b3b" stroke-width="2"/>
 <text x="190" y="116" text-anchor="middle" fill="#ff7a7a" font-size="16" font-weight="700">Raspberry Pi 3B+  (the brain / UI)</text>
 
-<rect x="60" y="130" width="260" height="70" rx="8" fill="#1b2230" stroke="#2a3550"/>
+<rect x="60" y="130" width="260" height="64" rx="8" fill="#1b2230" stroke="#2a3550"/>
 <text x="190" y="150" text-anchor="middle" fill="#e8eef7" font-size="13" font-weight="700">Launcher  (Python, ~1500 LOC)</text>
 <text x="190" y="168" text-anchor="middle" fill="#8a97ab" font-size="11">framebuffer UI · screen state machine</text>
 <text x="190" y="184" text-anchor="middle" fill="#8a97ab" font-size="11">dirty-flag render · evdev touch</text>
 
-<rect x="60" y="208" width="260" height="60" rx="8" fill="#1b2230" stroke="#2a3550"/>
-<text x="190" y="228" text-anchor="middle" fill="#cfe0ff" font-size="13" font-weight="700">Sub-GHz plugin (subghz.py)</text>
-<text x="190" y="246" text-anchor="middle" fill="#8a97ab" font-size="11">Analyze · Record · Replay · Saved</text>
-<text x="190" y="260" text-anchor="middle" fill="#8a97ab" font-size="11">waveform graph · daemon workers</text>
+<rect x="60" y="202" width="260" height="58" rx="8" fill="#1b2230" stroke="#2a3550"/>
+<text x="190" y="221" text-anchor="middle" fill="#cfe0ff" font-size="13" font-weight="700">Sub-GHz + IR plugins</text>
+<text x="190" y="238" text-anchor="middle" fill="#8a97ab" font-size="11">subghz.py · ir.py (Flipper remotes)</text>
+<text x="190" y="252" text-anchor="middle" fill="#8a97ab" font-size="11">Analyze · Record · Replay · Saved</text>
 
-<rect x="60" y="276" width="260" height="56" rx="8" fill="#1b2230" stroke="#2a3550"/>
-<text x="190" y="296" text-anchor="middle" fill="#cfe0ff" font-size="13" font-weight="700">SubGhz client (acid_subghz.py)</text>
-<text x="190" y="314" text-anchor="middle" fill="#8a97ab" font-size="11">pyserial · command/response protocol</text>
+<rect x="60" y="268" width="260" height="52" rx="8" fill="#1b2230" stroke="#2a3550"/>
+<text x="190" y="286" text-anchor="middle" fill="#cfe0ff" font-size="13" font-weight="700">serial clients (pyserial)</text>
+<text x="190" y="303" text-anchor="middle" fill="#8a97ab" font-size="11">acid_subghz.py · acid_ir.py · acid_gps.py</text>
 
-<rect x="60" y="340" width="260" height="50" rx="8" fill="#2a2e36" stroke="#454b57"/>
-<text x="190" y="362" text-anchor="middle" fill="#aab3c2" font-size="12" font-weight="600">3.5" ILI9486 TFT  (SPI0, /dev/fb0)</text>
-<text x="190" y="378" text-anchor="middle" fill="#7c8696" font-size="10">+ ADS7846 resistive touch</text>
+<rect x="60" y="328" width="260" height="48" rx="8" fill="#2a2e36" stroke="#454b57"/>
+<text x="190" y="348" text-anchor="middle" fill="#aab3c2" font-size="12" font-weight="600">3.5" ILI9486 TFT  (SPI, /dev/fb0)</text>
+<text x="190" y="364" text-anchor="middle" fill="#7c8696" font-size="10">+ resistive touch · sole framebuffer owner</text>
 
-<rect x="60" y="398" width="260" height="44" rx="8" fill="#2a2e36" stroke="#454b57"/>
-<text x="190" y="416" text-anchor="middle" fill="#aab3c2" font-size="12" font-weight="600">4× USB Wi-Fi + onboard BLE</text>
-<text x="190" y="431" text-anchor="middle" fill="#7c8696" font-size="10">bound by USB VID:PID</text>
+<rect x="60" y="384" width="260" height="46" rx="8" fill="#2a2e36" stroke="#454b57"/>
+<text x="190" y="403" text-anchor="middle" fill="#aab3c2" font-size="12" font-weight="600">USB Wi-Fi ×N + onboard BLE</text>
+<text x="190" y="419" text-anchor="middle" fill="#7c8696" font-size="10">bound by USB VID:PID</text>
 
-<text x="190" y="470" text-anchor="middle" fill="#7c8696" font-size="11">base OS: jayofelony pwnagotchi</text>
+<rect x="60" y="438" width="260" height="46" rx="8" fill="#14223a" stroke="#2f5aa0"/>
+<text x="190" y="457" text-anchor="middle" fill="#9fc0ff" font-size="12" font-weight="600">GPS — u-blox 7 (USB, /dev/ttyACM0)</text>
+<text x="190" y="473" text-anchor="middle" fill="#7c8696" font-size="10">NMEA → acid_gps.py (wardrive tags)</text>
 
-<!-- ============ ESP32 ============ -->
-<rect x="430" y="150" width="270" height="220" rx="12" fill="#16181d" stroke="#3b7a3b" stroke-width="2"/>
+<text x="190" y="502" text-anchor="middle" fill="#7c8696" font-size="11">base OS: jayofelony pwnagotchi</text>
+
+<!-- ============ ESP32 (one board, both radios) ============ -->
+<rect x="430" y="150" width="270" height="300" rx="12" fill="#16181d" stroke="#3b7a3b" stroke-width="2"/>
 <text x="565" y="174" text-anchor="middle" fill="#7ee07e" font-size="16" font-weight="700">ESP32-WROOM-32</text>
-<text x="565" y="192" text-anchor="middle" fill="#8a97ab" font-size="11">co-processor / radio brain</text>
-<rect x="450" y="204" width="230" height="62" rx="8" fill="#1b2230" stroke="#2a3550"/>
-<text x="565" y="224" text-anchor="middle" fill="#cfe0ff" font-size="12" font-weight="700">firmware (Arduino)</text>
-<text x="565" y="241" text-anchor="middle" fill="#8a97ab" font-size="11">serial parser · ELECHOUSE CC1101</text>
-<text x="565" y="256" text-anchor="middle" fill="#8a97ab" font-size="11">modulation profiles · RMT capture</text>
-<rect x="450" y="274" width="230" height="40" rx="8" fill="#2a2e36" stroke="#454b57"/>
-<text x="565" y="298" text-anchor="middle" fill="#aab3c2" font-size="11" font-weight="600">RMT peripheral = hw-precise timing</text>
-<text x="565" y="338" text-anchor="middle" fill="#7c8696" font-size="11">dual-core · USB-CDC to the Pi</text>
+<text x="565" y="192" text-anchor="middle" fill="#8a97ab" font-size="11">one co-processor — RF + IR brain</text>
+<rect x="450" y="204" width="230" height="76" rx="8" fill="#1b2230" stroke="#2a3550"/>
+<text x="565" y="224" text-anchor="middle" fill="#cfe0ff" font-size="12" font-weight="700">firmware (Arduino, merged)</text>
+<text x="565" y="241" text-anchor="middle" fill="#8a97ab" font-size="11">CC1101 driver (ELECHOUSE)</text>
+<text x="565" y="256" text-anchor="middle" fill="#8a97ab" font-size="11">+ IR (IRremoteESP8266)</text>
+<text x="565" y="271" text-anchor="middle" fill="#8a97ab" font-size="11">one serial parser · prefix-routed cmds</text>
+<rect x="450" y="288" width="230" height="44" rx="8" fill="#2a2e36" stroke="#454b57"/>
+<text x="565" y="308" text-anchor="middle" fill="#aab3c2" font-size="11" font-weight="600">RMT peripheral = hw-precise timing</text>
+<text x="565" y="323" text-anchor="middle" fill="#7c8696" font-size="10">raw OOK capture + IR carrier</text>
+<text x="565" y="360" text-anchor="middle" fill="#7c8696" font-size="11">dual-core · USB-CDC to the Pi</text>
+<text x="565" y="392" text-anchor="middle" fill="#7c8696" font-size="10">CC1101: GDO0 D4 · CSN D5 · SCK D18</text>
+<text x="565" y="407" text-anchor="middle" fill="#7c8696" font-size="10">MOSI D19 · MISO D23   |   IR: TX D13 · RX D14</text>
+<text x="565" y="430" text-anchor="middle" fill="#5a7a5a" font-size="10">full pin map → docs/pinout-esp32-allinone.svg</text>
 
 <!-- ============ CC1101 ============ -->
-<rect x="790" y="170" width="170" height="180" rx="12" fill="#14305f" stroke="#2f5aa0" stroke-width="2"/>
-<text x="875" y="196" text-anchor="middle" fill="#cfe0ff" font-size="15" font-weight="700">CC1101</text>
-<text x="875" y="214" text-anchor="middle" fill="#7fa0d8" font-size="11">sub-GHz transceiver</text>
-<text x="875" y="236" text-anchor="middle" fill="#8a97ab" font-size="11">300–928 MHz</text>
-<text x="875" y="252" text-anchor="middle" fill="#8a97ab" font-size="11">ASK/OOK · 2-FSK</text>
-<circle cx="875" cy="296" r="16" fill="none" stroke="#d4af37" stroke-width="3"/>
-<line x1="875" y1="312" x2="875" y2="334" stroke="#d4af37" stroke-width="4"/>
-<text x="875" y="332" text-anchor="middle" fill="#9a8a40" font-size="10">SMA</text>
+<rect x="790" y="110" width="210" height="170" rx="12" fill="#14305f" stroke="#2f5aa0" stroke-width="2"/>
+<text x="895" y="136" text-anchor="middle" fill="#cfe0ff" font-size="15" font-weight="700">CC1101</text>
+<text x="895" y="154" text-anchor="middle" fill="#7fa0d8" font-size="11">sub-GHz transceiver</text>
+<text x="895" y="176" text-anchor="middle" fill="#8a97ab" font-size="11">300–928 MHz</text>
+<text x="895" y="192" text-anchor="middle" fill="#8a97ab" font-size="11">ASK/OOK · 2-FSK</text>
+<circle cx="895" cy="230" r="15" fill="none" stroke="#d4af37" stroke-width="3"/>
+<line x1="895" y1="245" x2="895" y2="266" stroke="#d4af37" stroke-width="4"/>
+<text x="895" y="262" text-anchor="middle" fill="#9a8a40" font-size="10">SMA</text>
+
+<!-- ============ IR ============ -->
+<rect x="790" y="316" width="210" height="150" rx="12" fill="#3a2410" stroke="#a06a2a" stroke-width="2"/>
+<text x="895" y="342" text-anchor="middle" fill="#ffce9a" font-size="15" font-weight="700">IR  TX / RX</text>
+<text x="895" y="360" text-anchor="middle" fill="#d8a878" font-size="11">IRremoteESP8266</text>
+<text x="895" y="382" text-anchor="middle" fill="#8a97ab" font-size="11">TX: LED driver (GPIO13)</text>
+<text x="895" y="398" text-anchor="middle" fill="#8a97ab" font-size="11">RX: TSOP demod (GPIO14)</text>
+<text x="895" y="420" text-anchor="middle" fill="#8a97ab" font-size="11">capture + raw replay (AC too)</text>
+<line x1="875" y1="440" x2="915" y2="440" stroke="#ff8a3d" stroke-width="3"/>
+<text x="895" y="458" text-anchor="middle" fill="#e08a55" font-size="10">38 kHz beam</text>
 
 <!-- ============ links ============ -->
 <g font-size="12" font-weight="700">
-<line x1="340" y1="240" x2="430" y2="240" stroke="#45c46a" stroke-width="3" marker-end="url(#a)"/>
-<line x1="430" y1="252" x2="340" y2="252" stroke="#45c46a" stroke-width="3" marker-end="url(#a)"/>
-<text x="385" y="232" text-anchor="middle" fill="#7ee07e">USB</text>
-<text x="385" y="276" text-anchor="middle" fill="#7ee07e">serial</text>
-<line x1="700" y1="250" x2="790" y2="250" stroke="#4aa3ff" stroke-width="3" marker-end="url(#b)"/>
-<line x1="790" y1="262" x2="700" y2="262" stroke="#4aa3ff" stroke-width="3" marker-end="url(#b)"/>
-<text x="745" y="242" text-anchor="middle" fill="#4aa3ff">SPI</text>
-<text x="745" y="286" text-anchor="middle" fill="#4aa3ff">+GDO0</text>
-<line x1="875" y1="334" x2="875" y2="360" stroke="#d4af37" stroke-width="2"/>
-<text x="875" y="380" text-anchor="middle" fill="#d4af37" font-size="11">RF 433 MHz</text>
+<line x1="340" y1="278" x2="430" y2="278" stroke="#45c46a" stroke-width="3" marker-end="url(#a)"/>
+<line x1="430" y1="292" x2="340" y2="292" stroke="#45c46a" stroke-width="3" marker-end="url(#a)"/>
+<text x="385" y="270" text-anchor="middle" fill="#7ee07e">USB</text>
+<text x="385" y="312" text-anchor="middle" fill="#7ee07e">serial</text>
+
+<line x1="700" y1="196" x2="790" y2="196" stroke="#4aa3ff" stroke-width="3" marker-end="url(#b)"/>
+<line x1="790" y1="210" x2="700" y2="210" stroke="#4aa3ff" stroke-width="3" marker-end="url(#b)"/>
+<text x="745" y="188" text-anchor="middle" fill="#4aa3ff">SPI + GDO0</text>
+
+<line x1="700" y1="384" x2="790" y2="384" stroke="#ff8a3d" stroke-width="3" marker-end="url(#c)"/>
+<line x1="790" y1="398" x2="700" y2="398" stroke="#ff8a3d" stroke-width="3" marker-end="url(#c)"/>
+<text x="745" y="376" text-anchor="middle" fill="#ff8a3d">IR GPIO</text>
+
+<line x1="895" y1="266" x2="895" y2="292" stroke="#d4af37" stroke-width="2"/>
+<text x="960" y="240" text-anchor="middle" fill="#d4af37" font-size="11">RF 433 MHz</text>
 </g>
 <defs>
 <marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#45c46a"/></marker>
 <marker id="b" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#4aa3ff"/></marker>
+<marker id="c" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#ff8a3d"/></marker>
 </defs>
 
 <!-- ============ flow strip ============ -->
-<rect x="40" y="512" width="920" height="34" rx="8" fill="#11202b"/>
-<text x="500" y="534" text-anchor="middle" fill="#9fd0c0" font-size="13" font-weight="700">Pi launcher (Python)  →  USB serial  →  ESP32 firmware  →  SPI + GDO0  →  CC1101  →  RF antenna</text>
+<rect x="40" y="536" width="960" height="52" rx="8" fill="#11202b"/>
+<text x="520" y="558" text-anchor="middle" fill="#9fd0c0" font-size="13" font-weight="700">Pi launcher (Python)  →  USB serial @115200  →  ESP32 firmware (one board)</text>
+<text x="520" y="578" text-anchor="middle" fill="#9fd0c0" font-size="13" font-weight="700">├─ SPI + GDO0 → CC1101 → RF antenna       └─ GPIO13/14 → IR LED / TSOP → 38 kHz beam</text>
 </svg>

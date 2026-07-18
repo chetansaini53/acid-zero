@@ -78,11 +78,15 @@ The hard parts — the reasons this is worth a reviewer's time. The recurring th
 A **distributed co-processor model** — keeping real-time radio work off the core so it never blocks the primary UI framebuffer:
 
 - **Main Core (the brain):** Raspberry Pi 3B+ running Python-based **framebuffer state management** and **concurrent plugin orchestration** — it owns the display, the resistive touch panel, and the Wi-Fi/BLE radios.
-- **Radio Co-Processor:** an **ESP32** handling raw, **hardware-precise pulse timing via its RMT peripheral** to interface with the **CC1101** transceiver over **SPI** — linked to the Pi over **USB serial @ 115200**. Source + a ready-to-flash binary live in [`firmware/`](firmware/) (flashing guide: [`firmware/README.md`](firmware/README.md)).
+- **Radio + IR Co-Processor:** a single **ESP32** using its **hardware-precise RMT peripheral** to drive **both** the **CC1101** sub-GHz transceiver (over **SPI**) **and** an **IR** transmitter/receiver (over GPIO) — one board, one **USB serial @ 115200** link to the Pi, command-prefix routed. Source + a ready-to-flash binary live in [`firmware/`](firmware/) (flashing guide: [`firmware/README.md`](firmware/README.md)).
 
 > 📐 **Full system architecture** — the Pi ↔ ESP32 ↔ CC1101 split, the serial protocol, the signal pipeline, and the state machines: **[ARCHITECTURE.md](./ARCHITECTURE.md)**
 
 ![System architecture](docs/architecture.svg)
+
+**ESP32 co-processor pin map** — CC1101 + IR on one 38-pin board (full wiring: [`docs/wiring-acidzero-map.svg`](docs/wiring-acidzero-map.svg)):
+
+![ESP32 all-in-one pinout — CC1101 + IR](docs/pinout-esp32-allinone.svg)
 
 One Python process, many threads. All UI lives on the render thread; every I/O path is offloaded to a daemon thread that only mutates shared state and raises a `dirty` flag.
 
