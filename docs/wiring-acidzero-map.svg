@@ -1,0 +1,154 @@
+<svg viewBox="0 0 1200 1440" xmlns="http://www.w3.org/2000/svg" role="img" font-family="Segoe UI, Roboto, Arial, sans-serif">
+<title>Acid Zero full wiring map — ESP32 (CC1101 + IR) and Raspberry Pi (GPS)</title>
+<desc>Complete wiring map for Acid Zero. ESP32 38-pin board shown exactly as the user's board (USB at bottom). CC1101 8-pin module to ESP32: GND-GND, VCC-3V3, GDO0-P4/GPIO4, CSN-P5/GPIO5, SCK-P18/GPIO18, MOSI-P19/GPIO19, MISO/GDO1-P23/GPIO23, GDO2 n/c. IR TX 3-pin: S-P13/GPIO13, VCC-3V3, GND-GND. IR RX 4-pin (G V S A): G-GND, V-3V3, S-P14/GPIO14, A n/c. GPS 5-pin goes to the RASPBERRY PI UART (not the ESP32): VCC-Pi 3V3, GND-Pi GND, TXD-Pi RXD/GPIO15 pin10, RXD-Pi TXD/GPIO14 pin8, PPS optional. MOSI-P19 and MISO-P23 are firmware-swapped versus the default VSPI silk - wire per firmware or reads return 0x00. CC1101 is 3.3V only. GDO0 is bidirectional (RX capture + TX replay). Independently verified 3/3 agents.</desc>
+<rect x="0" y="0" width="1200" height="1440" rx="14" fill="#0e1525"/>
+
+<!-- header -->
+<text x="600" y="42" text-anchor="middle" fill="#e8eef7" font-size="26" font-weight="700">Acid Zero — Full Wiring Map</text>
+<text x="600" y="68" text-anchor="middle" fill="#8a97ab" font-size="13">ESP32 co-processor (CC1101 + IR)  ·  Raspberry Pi (GPS)  ·  pins match firmware exactly</text>
+<rect x="470" y="82" width="260" height="22" rx="11" fill="#14311f" stroke="#2f7a4a" stroke-width="1"/>
+<text x="600" y="97" text-anchor="middle" fill="#7fe0a8" font-size="11" font-weight="700">✓ independently verified — 3/3 agents, all fields matched</text>
+
+<!-- ================= ESP32 BOARD (exact user layout, USB at bottom) ================= -->
+<text x="600" y="132" text-anchor="middle" fill="#aab3c2" font-size="14" font-weight="700">ESP32 — your exact board layout (USB at bottom)</text>
+<rect x="470" y="146" width="260" height="516" rx="10" fill="#16181d" stroke="#30343f" stroke-width="2"/>
+<text x="600" y="396" text-anchor="middle" fill="#3a4150" font-size="30" font-weight="700">ESP32</text>
+<text x="600" y="418" text-anchor="middle" fill="#333a48" font-size="12">D0WD-V3 · 38-pin</text>
+<rect x="566" y="646" width="68" height="18" rx="3" fill="#9aa1ad"/><text x="600" y="659" text-anchor="middle" fill="#2a2e36" font-size="9" font-weight="700">USB ↓</text>
+
+<!-- board rows: left col at x470 edge, right col at x730 edge -->
+<g font-size="12">
+<!-- i0 -->
+<rect x="462" y="163" width="12" height="14" rx="2" fill="#9aa4b2"/><text x="480" y="174" fill="#cfd7e3">GND</text>
+<line x1="462" y1="170" x2="430" y2="170" stroke="#9aa4b2" stroke-width="1.5"/><text x="424" y="174" text-anchor="end" fill="#9aa4b2" font-size="11">GND</text>
+<rect x="726" y="163" width="12" height="14" rx="2" fill="#ff5a5a"/><text x="720" y="174" text-anchor="end" fill="#ffd0d0">3V3</text>
+<line x1="738" y1="170" x2="772" y2="170" stroke="#ff5a5a" stroke-width="1.5"/><text x="778" y="174" fill="#ff8a8a" font-size="11" font-weight="700">POWER 3V3</text>
+<!-- i1 -->
+<rect x="462" y="189" width="12" height="14" rx="2" fill="#2ad0e0"/><text x="480" y="200" fill="#e8eef7" font-weight="700">P23</text>
+<line x1="462" y1="196" x2="430" y2="196" stroke="#2ad0e0" stroke-width="1.5"/><text x="424" y="200" text-anchor="end" fill="#2ad0e0" font-size="11" font-weight="700">CC1101 MISO</text>
+<rect x="726" y="189" width="12" height="14" rx="2" fill="#2a2e36"/><text x="720" y="200" text-anchor="end" fill="#8a97ab">EN</text>
+<!-- i2 -->
+<rect x="462" y="215" width="12" height="14" rx="2" fill="#2a2e36"/><text x="480" y="226" fill="#8a97ab">P22</text>
+<rect x="726" y="215" width="12" height="14" rx="2" fill="#2a2e36"/><text x="720" y="226" text-anchor="end" fill="#8a97ab">SVP</text>
+<!-- i3 -->
+<rect x="462" y="241" width="12" height="14" rx="2" fill="#2a2e36"/><text x="480" y="252" fill="#8a97ab">TX</text>
+<rect x="726" y="241" width="12" height="14" rx="2" fill="#2a2e36"/><text x="720" y="252" text-anchor="end" fill="#8a97ab">SVN</text>
+<!-- i4 -->
+<rect x="462" y="267" width="12" height="14" rx="2" fill="#2a2e36"/><text x="480" y="278" fill="#8a97ab">RX</text>
+<rect x="726" y="267" width="12" height="14" rx="2" fill="#2a2e36"/><text x="720" y="278" text-anchor="end" fill="#8a97ab">P34</text>
+<!-- i5 -->
+<rect x="462" y="293" width="12" height="14" rx="2" fill="#2a2e36"/><text x="480" y="304" fill="#8a97ab">P21</text>
+<rect x="726" y="293" width="12" height="14" rx="2" fill="#2a2e36"/><text x="720" y="304" text-anchor="end" fill="#8a97ab">P35</text>
+<!-- i6 -->
+<rect x="462" y="319" width="12" height="14" rx="2" fill="#9aa4b2"/><text x="480" y="330" fill="#cfd7e3">GND</text>
+<line x1="462" y1="326" x2="430" y2="326" stroke="#9aa4b2" stroke-width="1.5"/><text x="424" y="330" text-anchor="end" fill="#9aa4b2" font-size="11">GND</text>
+<rect x="726" y="319" width="12" height="14" rx="2" fill="#2a2e36"/><text x="720" y="330" text-anchor="end" fill="#8a97ab">P32</text>
+<!-- i7 -->
+<rect x="462" y="345" width="12" height="14" rx="2" fill="#b06cff"/><text x="480" y="356" fill="#e8eef7" font-weight="700">P19</text>
+<line x1="462" y1="352" x2="430" y2="352" stroke="#b06cff" stroke-width="1.5"/><text x="424" y="356" text-anchor="end" fill="#b06cff" font-size="11" font-weight="700">CC1101 MOSI</text>
+<rect x="726" y="345" width="12" height="14" rx="2" fill="#2a2e36"/><text x="720" y="356" text-anchor="end" fill="#8a97ab">P33</text>
+<!-- i8 -->
+<rect x="462" y="371" width="12" height="14" rx="2" fill="#4aa3ff"/><text x="480" y="382" fill="#e8eef7" font-weight="700">P18</text>
+<line x1="462" y1="378" x2="430" y2="378" stroke="#4aa3ff" stroke-width="1.5"/><text x="424" y="382" text-anchor="end" fill="#4aa3ff" font-size="11" font-weight="700">CC1101 SCK</text>
+<rect x="726" y="371" width="12" height="14" rx="2" fill="#2a2e36"/><text x="720" y="382" text-anchor="end" fill="#8a97ab">P25</text>
+<!-- i9 -->
+<rect x="462" y="397" width="12" height="14" rx="2" fill="#45c46a"/><text x="480" y="408" fill="#e8eef7" font-weight="700">P5</text>
+<line x1="462" y1="404" x2="430" y2="404" stroke="#45c46a" stroke-width="1.5"/><text x="424" y="408" text-anchor="end" fill="#45c46a" font-size="11" font-weight="700">CC1101 CSN</text>
+<rect x="726" y="397" width="12" height="14" rx="2" fill="#2a2e36"/><text x="720" y="408" text-anchor="end" fill="#8a97ab">P26</text>
+<!-- i10 -->
+<rect x="462" y="423" width="12" height="14" rx="2" fill="#2a2e36"/><text x="480" y="434" fill="#8a97ab">P17</text>
+<rect x="726" y="423" width="12" height="14" rx="2" fill="#2a2e36"/><text x="720" y="434" text-anchor="end" fill="#8a97ab">P27</text>
+<!-- i11 -->
+<rect x="462" y="449" width="12" height="14" rx="2" fill="#2a2e36"/><text x="480" y="460" fill="#8a97ab">P16</text>
+<rect x="726" y="449" width="12" height="14" rx="2" fill="#c96426"/><text x="720" y="460" text-anchor="end" fill="#e8eef7" font-weight="700">P14</text>
+<line x1="738" y1="456" x2="772" y2="456" stroke="#c96426" stroke-width="1.5"/><text x="778" y="460" fill="#e08a55" font-size="11" font-weight="700">IR RX</text>
+<!-- i12 -->
+<rect x="462" y="475" width="12" height="14" rx="2" fill="#ffb02e"/><text x="480" y="486" fill="#e8eef7" font-weight="700">P4</text>
+<line x1="462" y1="482" x2="430" y2="482" stroke="#ffb02e" stroke-width="1.5"/><text x="424" y="486" text-anchor="end" fill="#ffb02e" font-size="11" font-weight="700">CC1101 GDO0</text>
+<rect x="726" y="475" width="12" height="14" rx="2" fill="#2a2e36"/><text x="720" y="486" text-anchor="end" fill="#8a97ab">P12</text>
+<!-- i13 -->
+<rect x="462" y="501" width="12" height="14" rx="2" fill="#2a2e36"/><text x="480" y="512" fill="#8a97ab">P0</text>
+<rect x="726" y="501" width="12" height="14" rx="2" fill="#9aa4b2"/><text x="720" y="512" text-anchor="end" fill="#cfd7e3">GND</text>
+<line x1="738" y1="508" x2="772" y2="508" stroke="#9aa4b2" stroke-width="1.5"/><text x="778" y="512" fill="#9aa4b2" font-size="11">GND</text>
+<!-- i14 -->
+<rect x="462" y="527" width="12" height="14" rx="2" fill="#2a2e36"/><text x="480" y="538" fill="#8a97ab">P2</text>
+<rect x="726" y="527" width="12" height="14" rx="2" fill="#ff8a3d"/><text x="720" y="538" text-anchor="end" fill="#e8eef7" font-weight="700">P13</text>
+<line x1="738" y1="534" x2="772" y2="534" stroke="#ff8a3d" stroke-width="1.5"/><text x="778" y="538" fill="#ff8a3d" font-size="11" font-weight="700">IR TX</text>
+<!-- i15 -->
+<rect x="462" y="553" width="12" height="14" rx="2" fill="#2a2e36"/><text x="480" y="564" fill="#8a97ab">P15</text>
+<rect x="726" y="553" width="12" height="14" rx="2" fill="#2a2e36"/><text x="720" y="564" text-anchor="end" fill="#8a97ab">SD2</text>
+<!-- i16 -->
+<rect x="462" y="579" width="12" height="14" rx="2" fill="#3a3f49"/><text x="480" y="590" fill="#6b7585">SD1</text>
+<rect x="726" y="579" width="12" height="14" rx="2" fill="#3a3f49"/><text x="720" y="590" text-anchor="end" fill="#6b7585">SD3</text>
+<!-- i17 -->
+<rect x="462" y="605" width="12" height="14" rx="2" fill="#3a3f49"/><text x="480" y="616" fill="#6b7585">SD0</text>
+<rect x="726" y="605" width="12" height="14" rx="2" fill="#3a3f49"/><text x="720" y="616" text-anchor="end" fill="#6b7585">CMD</text>
+<!-- i18 -->
+<rect x="462" y="631" width="12" height="14" rx="2" fill="#3a3f49"/><text x="480" y="642" fill="#6b7585">CLK</text>
+<rect x="726" y="631" width="12" height="14" rx="2" fill="#ff5a5a"/><text x="720" y="642" text-anchor="end" fill="#ffd0d0">5V</text>
+<line x1="738" y1="638" x2="772" y2="638" stroke="#ff5a5a" stroke-width="1.5"/><text x="778" y="642" fill="#ff8a8a" font-size="11" font-weight="700">5V IN</text>
+</g>
+
+<!-- ================= CC1101 card ================= -->
+<rect x="40" y="700" width="520" height="322" rx="10" fill="#141c2e" stroke="#2a3850" stroke-width="1.5"/>
+<text x="60" y="730" fill="#e8eef7" font-size="16" font-weight="700">CC1101  (8-pin module)  →  ESP32</text>
+<line x1="56" y1="742" x2="544" y2="742" stroke="#26303f"/>
+<g font-size="14">
+<rect x="60" y="758" width="15" height="15" rx="3" fill="#9aa4b2"/><text x="86" y="771" fill="#e8eef7" font-weight="600">1  GND</text><text x="300" y="771" fill="#8a97ab">→</text><text x="330" y="771" fill="#e8eef7" font-weight="600">GND</text><text x="440" y="771" fill="#8a97ab" font-size="12">ground</text>
+<rect x="60" y="792" width="15" height="15" rx="3" fill="#ff5a5a"/><text x="86" y="805" fill="#e8eef7" font-weight="600">2  VCC</text><text x="300" y="805" fill="#8a97ab">→</text><text x="330" y="805" fill="#e8eef7" font-weight="600">3V3</text><text x="440" y="805" fill="#ff9a9a" font-size="12" font-weight="600">3.3 V ONLY</text>
+<rect x="60" y="826" width="15" height="15" rx="3" fill="#ffb02e"/><text x="86" y="839" fill="#e8eef7" font-weight="600">3  GDO0</text><text x="300" y="839" fill="#8a97ab">→</text><text x="330" y="839" fill="#e8eef7" font-weight="600">P4 (GPIO4)</text><text x="440" y="839" fill="#ffd98a" font-size="12" font-weight="600">RX + TX (both)</text>
+<rect x="60" y="860" width="15" height="15" rx="3" fill="#45c46a"/><text x="86" y="873" fill="#e8eef7" font-weight="600">4  CSN</text><text x="300" y="873" fill="#8a97ab">→</text><text x="330" y="873" fill="#e8eef7" font-weight="600">P5 (GPIO5)</text><text x="440" y="873" fill="#8a97ab" font-size="12">SPI chip-select</text>
+<rect x="60" y="894" width="15" height="15" rx="3" fill="#4aa3ff"/><text x="86" y="907" fill="#e8eef7" font-weight="600">5  SCK</text><text x="300" y="907" fill="#8a97ab">→</text><text x="330" y="907" fill="#e8eef7" font-weight="600">P18 (GPIO18)</text><text x="440" y="907" fill="#8a97ab" font-size="12">SPI clock</text>
+<rect x="60" y="928" width="15" height="15" rx="3" fill="#b06cff"/><text x="86" y="941" fill="#e8eef7" font-weight="600">6  MOSI</text><text x="300" y="941" fill="#8a97ab">→</text><text x="330" y="941" fill="#e8eef7" font-weight="600">P19 (GPIO19)</text><text x="440" y="941" fill="#ffb02e" font-size="12" font-weight="600">⚠ swapped</text>
+<rect x="60" y="962" width="15" height="15" rx="3" fill="#2ad0e0"/><text x="86" y="975" fill="#e8eef7" font-weight="600">7  MISO / GDO1</text><text x="300" y="975" fill="#8a97ab">→</text><text x="330" y="975" fill="#e8eef7" font-weight="600">P23 (GPIO23)</text><text x="440" y="975" fill="#ffb02e" font-size="12" font-weight="600">⚠ swapped</text>
+<rect x="60" y="996" width="15" height="15" rx="3" fill="#5a6270"/><text x="86" y="1009" fill="#8a97ab" font-weight="600">8  GDO2</text><text x="300" y="1009" fill="#5a6270">✕</text><text x="330" y="1009" fill="#8a97ab" font-weight="600">n/c</text><text x="440" y="1009" fill="#8a97ab" font-size="12">unused (not needed)</text>
+</g>
+
+<!-- ================= IR TX card ================= -->
+<rect x="40" y="1038" width="520" height="150" rx="10" fill="#141c2e" stroke="#2a3850" stroke-width="1.5"/>
+<text x="60" y="1068" fill="#e8eef7" font-size="16" font-weight="700">IR TX  (3-pin: S / center / −)  →  ESP32</text>
+<line x1="56" y1="1080" x2="544" y2="1080" stroke="#26303f"/>
+<g font-size="14">
+<rect x="60" y="1096" width="15" height="15" rx="3" fill="#ff8a3d"/><text x="86" y="1109" fill="#e8eef7" font-weight="600">S  (signal)</text><text x="300" y="1109" fill="#8a97ab">→</text><text x="330" y="1109" fill="#e8eef7" font-weight="600">P13 (GPIO13)</text><text x="460" y="1109" fill="#8a97ab" font-size="12">IR TX out</text>
+<rect x="60" y="1128" width="15" height="15" rx="3" fill="#ff5a5a"/><text x="86" y="1141" fill="#e8eef7" font-weight="600">center  (VCC)</text><text x="300" y="1141" fill="#8a97ab">→</text><text x="330" y="1141" fill="#e8eef7" font-weight="600">3V3</text><text x="460" y="1141" fill="#8a97ab" font-size="12">power</text>
+<rect x="60" y="1160" width="15" height="15" rx="3" fill="#9aa4b2"/><text x="86" y="1173" fill="#e8eef7" font-weight="600">−  (GND)</text><text x="300" y="1173" fill="#8a97ab">→</text><text x="330" y="1173" fill="#e8eef7" font-weight="600">GND</text><text x="460" y="1173" fill="#8a97ab" font-size="12">ground</text>
+</g>
+
+<!-- ================= IR RX card ================= -->
+<rect x="640" y="700" width="520" height="188" rx="10" fill="#141c2e" stroke="#2a3850" stroke-width="1.5"/>
+<text x="660" y="730" fill="#e8eef7" font-size="16" font-weight="700">IR RX  (4-pin: G V S A)  →  ESP32</text>
+<line x1="656" y1="742" x2="1144" y2="742" stroke="#26303f"/>
+<g font-size="14">
+<rect x="660" y="758" width="15" height="15" rx="3" fill="#9aa4b2"/><text x="686" y="771" fill="#e8eef7" font-weight="600">G  (ground)</text><text x="900" y="771" fill="#8a97ab">→</text><text x="930" y="771" fill="#e8eef7" font-weight="600">GND</text><text x="1050" y="771" fill="#8a97ab" font-size="12">ground</text>
+<rect x="660" y="792" width="15" height="15" rx="3" fill="#ff5a5a"/><text x="686" y="805" fill="#e8eef7" font-weight="600">V  (VCC)</text><text x="900" y="805" fill="#8a97ab">→</text><text x="930" y="805" fill="#e8eef7" font-weight="600">3V3</text><text x="1050" y="805" fill="#8a97ab" font-size="12">power</text>
+<rect x="660" y="826" width="15" height="15" rx="3" fill="#c96426"/><text x="686" y="839" fill="#e8eef7" font-weight="600">S  (signal)</text><text x="900" y="839" fill="#8a97ab">→</text><text x="930" y="839" fill="#e8eef7" font-weight="600">P14 (GPIO14)</text><text x="1050" y="839" fill="#8a97ab" font-size="12">IR RX in</text>
+<rect x="660" y="860" width="15" height="15" rx="3" fill="#5a6270"/><text x="686" y="873" fill="#8a97ab" font-weight="600">A  (unknown)</text><text x="900" y="873" fill="#5a6270">✕</text><text x="930" y="873" fill="#8a97ab" font-weight="600">n/c</text><text x="1050" y="873" fill="#ffb02e" font-size="12" font-weight="600">⚠ identify first</text>
+</g>
+
+<!-- ================= GPS -> Raspberry Pi card ================= -->
+<rect x="640" y="904" width="520" height="284" rx="10" fill="#12223f" stroke="#2f5aa0" stroke-width="1.5"/>
+<text x="660" y="934" fill="#cfe0ff" font-size="16" font-weight="700">GPS  (5-pin)  →  RASPBERRY PI</text>
+<text x="660" y="954" fill="#7fa0d8" font-size="12">not the ESP32 — GPS streams NMEA the Pi reads directly (acid_gps.py)</text>
+<line x1="656" y1="966" x2="1144" y2="966" stroke="#25406a"/>
+<g font-size="14">
+<rect x="660" y="982" width="15" height="15" rx="3" fill="#ff5a5a"/><text x="686" y="995" fill="#e8eef7" font-weight="600">VCC</text><text x="880" y="995" fill="#7fa0d8">→</text><text x="910" y="995" fill="#e8eef7" font-weight="600">Pi 3V3 (pin 1)</text><text x="1070" y="995" fill="#7fa0d8" font-size="12">3.3 V-safe</text>
+<rect x="660" y="1014" width="15" height="15" rx="3" fill="#9aa4b2"/><text x="686" y="1027" fill="#e8eef7" font-weight="600">GND</text><text x="880" y="1027" fill="#7fa0d8">→</text><text x="910" y="1027" fill="#e8eef7" font-weight="600">Pi GND (pin 6)</text><text x="1070" y="1027" fill="#7fa0d8" font-size="12">ground</text>
+<rect x="660" y="1046" width="15" height="15" rx="3" fill="#6cb0ff"/><text x="686" y="1059" fill="#e8eef7" font-weight="600">TXD</text><text x="880" y="1059" fill="#7fa0d8">→</text><text x="910" y="1059" fill="#e8eef7" font-weight="600">Pi RXD · GPIO15 (pin 10)</text><text x="880" y="1076" fill="#ffb02e" font-size="11" font-weight="600">⤷ crossover: GPS TX → Pi RX</text>
+<rect x="660" y="1090" width="15" height="15" rx="3" fill="#6cb0ff"/><text x="686" y="1103" fill="#e8eef7" font-weight="600">RXD</text><text x="880" y="1103" fill="#7fa0d8">→</text><text x="910" y="1103" fill="#e8eef7" font-weight="600">Pi TXD · GPIO14 (pin 8)</text><text x="880" y="1120" fill="#ffb02e" font-size="11" font-weight="600">⤷ crossover: GPS RX → Pi TX</text>
+<rect x="660" y="1134" width="15" height="15" rx="3" fill="#5a6270"/><text x="686" y="1147" fill="#8a97ab" font-weight="600">PPS</text><text x="880" y="1147" fill="#7fa0d8">→</text><text x="910" y="1147" fill="#8a97ab" font-weight="600">Pi GPIO (optional)</text><text x="1070" y="1147" fill="#7fa0d8" font-size="12">time sync</text>
+</g>
+<text x="660" y="1176" fill="#7fa0d8" font-size="11">On the Pi: enable_uart=1, disable the serial login console, and free the PL011 (dtoverlay=disable-bt) for stable 9600-baud NMEA.</text>
+
+<!-- ================= safety notes ================= -->
+<text x="40" y="1226" fill="#e8eef7" font-size="15" font-weight="700">⚠ Verified safety notes (raised by the review — read before wiring)</text>
+<g font-size="12.5" fill="#aab3c2">
+<text x="40" y="1252">1.  CC1101 is <tspan fill="#ff9a9a" font-weight="700">3.3 V ONLY</tspan> — VCC, all SPI lines and GDO0 must stay at 3.3 V. Any 5 V on the module destroys the radio.</text>
+<text x="40" y="1274">2.  <tspan fill="#ffb02e" font-weight="700">MOSI→P19 and MISO→P23 are firmware-swapped</tspan> vs the default VSPI silk (native MOSI=23/MISO=19). Wire per firmware or every read returns 0x00.</text>
+<text x="40" y="1296">3.  GDO0 (P4) is a <tspan fill="#ffd98a" font-weight="700">single bidirectional data line</tspan> — RX capture and TX replay both go through it. GDO2 is unused (leave open, don't tie to a rail).</text>
+<text x="40" y="1318">4.  GPIO5 (CSN) is a boot strapping pin (idles HIGH, fine) — never add an external pulldown on it. GPIO13/14 disable JTAG (acceptable).</text>
+<text x="40" y="1340">5.  GPS: power at <tspan fill="#6cb0ff" font-weight="700">3.3 V</tspan> so its TXD stays 3.3 V — the Pi's GPIO15 (RX) is NOT 5 V-tolerant. If your module must run at 5 V, add a level shifter on GPS-TXD.</text>
+<text x="40" y="1362">6.  IR RX pin "A" is unidentified — <tspan fill="#ffb02e" font-weight="700">leave n/c</tspan> until confirmed. IR TX direct off GPIO13 = weak range; add a transistor driver (module VCC 5 V, gate stays 3.3 V) for distance.</text>
+<text x="40" y="1384">7.  If the ESP32 and Pi run on separate supplies, <tspan fill="#e8eef7" font-weight="600">tie their grounds together</tspan> so the logic levels share a reference.</text>
+</g>
+<text x="40" y="1416" fill="#5a6270" font-size="11">Signal pins locked to firmware/esp32-allinone: SCK=18 · MISO=23 · MOSI=19 · CS=5 · GDO0=4 · IR TX=13 · IR RX=14.  Independently verified 3/3 agents.</text>
+</svg>
