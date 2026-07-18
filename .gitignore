@@ -29,6 +29,9 @@ config.toml
 *_key
 .env
 .aider*
+# local SSH debug helper (plaintext creds) + local harness dev config
+ssh_debug.py
+.claude/
 
 # ESP32 firmware build output (keep the flashable prebuilt/ bin, drop build/)
 firmware/**/build/
