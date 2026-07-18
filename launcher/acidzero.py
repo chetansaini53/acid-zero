@@ -892,8 +892,8 @@ def draw_settings(d):
     rr(d,(246,180,466,224),fill=TILE,outline=(70,130,235),w=2,r=12); ct(d,356,202,'System & Power',F_NM,(70,130,235))
     rr(d,(14,232,466,274),fill=TILE,outline=(30,200,121),w=2,r=12); ct(d,240,253,'WiFi / Radio Status',F_NM,(30,200,121))
     ct(d,240,288,'which adapter is SSH / monitor / AP  -  avoid breaking SSH',F_TINY,DIM)
-SVC=[('Pwnagotchi','pwnagotchi'),('Bluetooth','bluetooth'),('HS-Clean','acid-hs-clean.timer'),('HDMI Mirror','acid-hdmi-mirror')]
-SVC_YY=[36,66,96,126]   # row tops; draw_system() and the System touch handler share this
+SVC=[('Pwnagotchi','pwnagotchi'),('Bluetooth','bluetooth'),('HS-Clean','acid-hs-clean.timer'),('HDMI Mirror','acid-hdmi-mirror'),('Screen Stream','acid-fb-stream')]
+SVC_YY=[36,66,96,126,156]   # row tops; draw_system() and the System touch handler share this
 svc_state={}
 def svc_refresh():
     for nm,u in SVC:
@@ -932,11 +932,11 @@ def draw_system(d):
         dot=(25,200,121) if on else (235,180,40) if st in ('...','activating','?') else (235,80,80)
         d.ellipse((20,y+9,30,y+19),fill=dot); lt(d,40,y+14,nm,F_NM,FG); lt(d,300,y+14,st,F_SM,DIM)
         rr(d,(384,y+4,462,y+24),fill=((235,80,80) if on else (25,160,90)),r=5); ct(d,423,y+14,('STOP' if on else 'START'),F_SM,(245,245,245))
-    rr(d,(10,162,470,192),fill=(30,120,210),r=8); ct(d,W//2,177,'RESTART ACID ZERO',F_NM,(240,248,255))
-    if sys_confirm=='reboot' and time.time()-sys_confirm_t<5: rr(d,(10,198,470,228),fill=(235,140,40),r=8); ct(d,W//2,213,'tap again to REBOOT',F_NM,(25,12,0))
-    else: rr(d,(10,198,470,228),outline=(235,140,40),w=2,r=8); ct(d,W//2,213,'REBOOT SYSTEM',F_NM,(235,140,40))
-    if sys_confirm=='shutdown' and time.time()-sys_confirm_t<5: rr(d,(10,234,470,264),fill=(220,60,60),r=8); ct(d,W//2,249,'tap again to SHUTDOWN',F_NM,(255,235,235))
-    else: rr(d,(10,234,470,264),outline=(220,60,60),w=2,r=8); ct(d,W//2,249,'SHUTDOWN',F_NM,(220,60,60))
+    rr(d,(10,192,470,222),fill=(30,120,210),r=8); ct(d,W//2,207,'RESTART ACID ZERO',F_NM,(240,248,255))
+    if sys_confirm=='reboot' and time.time()-sys_confirm_t<5: rr(d,(10,228,470,258),fill=(235,140,40),r=8); ct(d,W//2,243,'tap again to REBOOT',F_NM,(25,12,0))
+    else: rr(d,(10,228,470,258),outline=(235,140,40),w=2,r=8); ct(d,W//2,243,'REBOOT SYSTEM',F_NM,(235,140,40))
+    if sys_confirm=='shutdown' and time.time()-sys_confirm_t<5: rr(d,(10,264,470,294),fill=(220,60,60),r=8); ct(d,W//2,279,'tap again to SHUTDOWN',F_NM,(255,235,235))
+    else: rr(d,(10,264,470,294),outline=(220,60,60),w=2,r=8); ct(d,W//2,279,'SHUTDOWN',F_NM,(220,60,60))
 def draw_calibrate(d,step):
     ct(d,W//2,52,'TOUCH  CALIBRATION',F_TIT,ACC); ct(d,W//2,82,'tap each green target   (%d / 4)'%(min(step+1,4)),F_NM,FG)
     ct(d,W//2,150,'use stylus / nail, tap firmly on the +',F_SM,DIM); ct(d,W//2,175,'order: TL  ->  TR  ->  BR  ->  BL',F_SM,DIM)
@@ -1348,12 +1348,12 @@ while True:
                                 hdmi_toggle() if u=='acid-hdmi-mirror' else svc_toggle(u)
                                 hit=True; break
                         if not hit:
-                            if 162<=ty<=192: _last_act=now; sys_confirm=''; restart_os()
-                            elif 198<=ty<=228:
+                            if 192<=ty<=222: _last_act=now; sys_confirm=''; restart_os()
+                            elif 228<=ty<=258:
                                 _last_act=now
                                 if sys_confirm=='reboot' and now-sys_confirm_t<5: power_cmd('reboot')
                                 else: sys_confirm='reboot'; sys_confirm_t=now
-                            elif 234<=ty<=264:
+                            elif 264<=ty<=294:
                                 _last_act=now
                                 if sys_confirm=='shutdown' and now-sys_confirm_t<5: power_cmd('poweroff')
                                 else: sys_confirm='shutdown'; sys_confirm_t=now
