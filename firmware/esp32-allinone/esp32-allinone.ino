@@ -50,8 +50,8 @@
 
 // ---- pin map (ESP32 board labels D5/D18/D23/D19/D4 = GPIO 5/18/23/19/4) ----
 static const uint8_t PIN_SCK  = 18;
-static const uint8_t PIN_MISO = 23;   // CC1101 MISO/SO  (brute-force confirmed: SO is on D23)
-static const uint8_t PIN_MOSI = 19;   // CC1101 MOSI/SI  (brute-force confirmed: SI is on D19)
+static const uint8_t PIN_MISO = 23;   // CC1101 MISO/SO  (brute-force confirmed on real HW: SO is on D23 - VER=0x14 present=YES)
+static const uint8_t PIN_MOSI = 19;   // CC1101 MOSI/SI  (brute-force confirmed on real HW: SI is on D19)
 static const uint8_t PIN_CS   = 5;
 static const uint8_t PIN_GDO0 = 4;
 
@@ -361,7 +361,7 @@ static const uint16_t PIN_IR_RX = 14;   // TSOP/VS1838 demod OUT
 static const uint16_t IR_BUF = 1024;    // long enough for AC frames
 
 IRsend g_irsend(PIN_IR_TX);
-IRrecv g_irrecv(PIN_IR_RX, IR_BUF, 15 /*ms end-gap*/, true);
+IRrecv g_irrecv(PIN_IR_RX, IR_BUF, 50 /*ms end-gap - AC remotes send long frames with ~20ms internal gaps; 15ms cut them short (UNKNOWN bits=15)*/, true);
 decode_results g_irres;
 
 static void doIrRx(int secs) {
