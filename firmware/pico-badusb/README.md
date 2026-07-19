@@ -19,7 +19,8 @@ DuckyScript**, and the Pico types it into the target.
 ## 1. Flash CircuitPython
 
 Hold **BOOTSEL**, plug the Pico 2 W into any PC → `RPI-RP2` drive appears → drop the
-**Pico 2 W CircuitPython `.uf2`** (from <https://circuitpython.org/board/raspberry_pi_pico2_w/>).
+**Pico 2 W CircuitPython `.uf2`** — use **CircuitPython 10.x** (the bundled `adafruit_hid`
+is built for it) — from <https://circuitpython.org/board/raspberry_pi_pico2_w/>.
 It reboots as a `CIRCUITPY` drive.
 
 ## 2. Copy the framework onto CIRCUITPY
@@ -27,12 +28,15 @@ It reboots as a `CIRCUITPY` drive.
 | From | To (CIRCUITPY) |
 |------|----------------|
 | `code.py` | `code.py` |
-| the **`adafruit_hid`** folder from the [CircuitPython library bundle](https://circuitpython.org/libraries) — **match your CircuitPython major version** | `lib/adafruit_hid/` |
+| the **`lib/`** folder **bundled in this repo** (contains `adafruit_hid/`, already the right version) | `lib/` |
 | `settings.toml.example` *(optional — only to rename the AP / change its password)* | `settings.toml` |
 | `boot.py` *(optional — stealth, see the file)* | `boot.py` |
 
-`wifi`, `socketpool`, `usb_hid` are built into CircuitPython — only `adafruit_hid`
-needs copying. **No WiFi credentials are required** — the Pico makes its own AP.
+`wifi`, `socketpool`, `usb_hid` are built into CircuitPython. The one external library,
+`adafruit_hid`, is **bundled in this repo** at [`lib/adafruit_hid/`](lib/) (compiled `.mpy`
+for **CircuitPython 10.x** — see [`lib/README.md`](lib/README.md)), so you can flash the
+Pico straight from the repo, no library-bundle hunt. **No WiFi credentials are required** —
+the Pico makes its own AP.
 
 Default AP: **SSID `AcidZero-Duck`**, **password `acidzero1337`** (WPA2). Change them
 in `settings.toml` (and keep `AP_SSID`/`AP_PSK` in the Pi's `acid_badusb.py` in sync).

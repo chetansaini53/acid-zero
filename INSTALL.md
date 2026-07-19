@@ -60,6 +60,8 @@ sudo cp -r lib/acid-ble/*               /usr/local/lib/acid-ble/
 # apps (plugins)
 sudo mkdir -p /usr/local/lib/acid-apps
 sudo cp -r apps/*                        /usr/local/lib/acid-apps/
+# native-app executables (hello-native, wardrive-csv, ...) must be runnable
+sudo chmod +x /usr/local/lib/acid-apps/*/*  2>/dev/null || true
 # systemd units
 sudo cp systemd/*                        /etc/systemd/system/
 ```
@@ -74,7 +76,21 @@ sudo systemctl enable --now acid-hs-clean.timer       # periodic handshake valid
 
 The TFT should now boot straight into the Acid Zero launcher.
 
-## 6. Adding apps (plugins)
+## 6. Co-processors (Sub-GHz / IR + Bad USB)
+
+Two optional co-processors add the RF and HID tooling — both ship with **everything
+needed to flash straight from this repo**:
+
+- **Sub-GHz + IR (ESP32):** CC1101 + IR TX/RX on one ESP32. Wiring + one-command flash
+  (prebuilt binary or build-from-source): **[firmware/README.md](firmware/README.md)**.
+- **Bad USB (Raspberry Pi Pico 2 W):** a self-hosted-AP USB HID injector. Flash guide —
+  CircuitPython + the **bundled `adafruit_hid`** library (no separate download): 
+  **[firmware/pico-badusb/README.md](firmware/pico-badusb/README.md)**. The Pi joins the
+  Pico's own Wi-Fi AP on a **dedicated spare 2.4 GHz adapter** (so SSH + internet stay on
+  the main uplink); the Bad USB app's **CONNECT** button runs the join. Full link diagram:
+  [docs/badusb-architecture.svg](docs/badusb-architecture.svg).
+
+## 7. Adding apps (plugins)
 
 - **Python plugin:** drop a `.py` with a `META = {name, icon, color}` dict and a
   `draw(d, ctx)` function into `/usr/local/lib/acid-apps/` (optionally `on_enter`,
