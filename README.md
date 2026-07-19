@@ -89,6 +89,22 @@ A **distributed co-processor model** — keeping real-time radio work off the co
 
 ![ESP32 all-in-one pinout — CC1101 + IR](docs/pinout-esp32-allinone.svg)
 
+### Bad USB — the Pico ↔ Pi link (a self-hosted-AP co-processor)
+
+Bad USB is a **second, independent co-processor** — a **Raspberry Pi Pico 2 W**. Unlike the ESP32 (which the Pi reaches over USB serial), the Pico talks to the Pi **over Wi-Fi that the Pico hosts itself**. That is what makes it field-portable: it depends on **no** existing network.
+
+![Bad USB — Pico ↔ Pi AP-mode link](docs/badusb-architecture.svg)
+
+**How the connection works:**
+
+1. **The Pico is its own access point.** On boot the Pico (CircuitPython) brings up a WPA2 Wi-Fi AP — `AcidZero-Duck`, gateway `192.168.4.1` — and starts a DuckyScript server on TCP `:1337`. No target network, no credentials to enter in the field.
+2. **The Pi joins it on a _dedicated_ adapter.** Tapping **CONNECT** makes the Pi scan for `AcidZero-Duck` on **`wlan2`** (a spare RTL8188EUS), then join via NetworkManager with a **static `192.168.4.2` + `never-default`** — the join installs **no default route**. The Pi's real uplink (`wlan1`, home Wi-Fi) keeps **SSH + internet** the whole time; the two links never fight.
+3. **DuckyScript over the link.** The Pi client (`acid_badusb.py`) opens a TCP socket to `192.168.4.1:1337` and streams a Flipper-compatible DuckyScript payload.
+4. **The Pico types it into the target.** The Pico is plugged into the target as a **USB HID keyboard** and replays the payload as keystrokes.
+5. **DISCONNECT** releases `wlan2`; nothing else on the Pi is touched.
+
+The result is a self-contained Rubber Ducky that works **anywhere** — the Pico brings its own network, and the Pi reaches it without ever giving up its own connectivity. *(Radio gotcha: the Pico W's CYW43 flakes on its first AP-start after a cold boot, so `code.py` retries — give it ~10–20 s before CONNECT.)*
+
 One Python process, many threads. All UI lives on the render thread; every I/O path is offloaded to a daemon thread that only mutates shared state and raises a `dirty` flag.
 
 ```
