@@ -1,9 +1,11 @@
-# Acid Zero - BadUSB co-processor (Raspberry Pi Pico 2 W, CircuitPython)
+# Acid Zero - BadUSB co-processor (Raspberry Pi Pico 2 W, CircuitPython) - AP MODE
 # ---------------------------------------------------------------------------
 # The Pico presents itself as a USB HID keyboard to the TARGET it is plugged
-# into, and joins your WiFi as `acidducky.local:1337`. The Pi (Acid Zero) sends
-# a Flipper-compatible DuckyScript payload over WiFi; this firmware parses it and
-# types it into the target. One board = a WiFi-controlled Rubber Ducky.
+# into, AND hosts its OWN WiFi access point (gateway 192.168.4.1). It needs NO
+# external WiFi, so it works ANYWHERE - home, the field, a client site - with no
+# per-location credentials. The Pi (Acid Zero) joins this AP on a dedicated
+# adapter and sends a Flipper-compatible DuckyScript payload to 192.168.4.1:1337;
+# this firmware types it into the target. A self-contained WiFi Rubber Ducky.
 #
 # Flipper/Hak5 DuckyScript supported: REM, STRING, STRINGLN, DELAY, DEFAULT_DELAY,
 # REPEAT, ID (ignored), modifier combos (CTRL/ALT/SHIFT/GUI/WINDOWS + key, incl.
@@ -11,8 +13,8 @@
 # F1-F12, HOME/END/PAGEUP/PAGEDOWN, DELETE, etc.).
 #
 # Setup: copy this file as code.py to the CIRCUITPY drive, copy the `adafruit_hid`
-# library folder into CIRCUITPY/lib/, and put your WiFi creds in settings.toml
-# (see settings.toml.example). See README.md.
+# library folder into CIRCUITPY/lib/. The AP SSID/password are optional overrides
+# in settings.toml (ACIDZERO_AP_SSID / ACIDZERO_AP_PASSWORD); see settings.toml.example.
 #
 # AUTHORIZED USE ONLY - inject keystrokes only into machines you own or are
 # explicitly authorized to test. Educational / own-lab. See ../../ETHICS.md.
@@ -20,13 +22,14 @@ import time
 import os
 import wifi
 import socketpool
-import mdns
 import usb_hid
 from adafruit_hid.keyboard import Keyboard
 from adafruit_hid.keyboard_layout_us import KeyboardLayoutUS
 from adafruit_hid.keycode import Keycode
 
-HOSTNAME = 'acidducky'      # reachable from the Pi at acidducky.local
+# The Pico hosts its own WPA2 AP (gateway 192.168.4.1). Override in settings.toml.
+AP_SSID = os.getenv('ACIDZERO_AP_SSID') or 'AcidZero-Duck'
+AP_PASSWORD = os.getenv('ACIDZERO_AP_PASSWORD') or 'acidzero1337'   # WPA2 needs >= 8 chars
 PORT = 1337
 
 kbd = Keyboard(usb_hid.devices)
@@ -139,44 +142,45 @@ def run_ducky(script):
     return n
 
 
-def _connect_wifi():
-    ssid = os.getenv('CIRCUITPY_WIFI_SSID')
-    pw = os.getenv('CIRCUITPY_WIFI_PASSWORD')
-    if not ssid:
-        raise RuntimeError('set CIRCUITPY_WIFI_SSID / _PASSWORD in settings.toml')
-    # The Pico W CYW43 radio frequently fails the FIRST association after a cold
-    # boot with a transient ConnectionError ("Unknown failure 1") even when the
-    # SSID/password are correct. Retry a few times so one transient miss doesn't
-    # crash the whole firmware on boot (proven: attempt 2 connects reliably).
-    last = None
-    for attempt in range(1, 9):
+def _start_ap():
+    # Host our own WPA2 access point. The CYW43 radio can fail the first start_ap
+    # after a cold boot (same transient class as a station connect), so retry.
+    if len(AP_PASSWORD) < 8:
+        raise RuntimeError('ACIDZERO_AP_PASSWORD must be at least 8 chars (WPA2)')
+    # Clean radio state first: drop any station connection or prior AP so the
+    # CYW43 starts the AP from a known state (a hot station->AP switch flakes).
+    for _fn in ('stop_station', 'stop_ap'):
         try:
-            print('acidducky: connecting to %s (attempt %d)' % (ssid, attempt))
-            wifi.radio.connect(ssid, pw)
-            print('acidducky: IP', wifi.radio.ipv4_address)
+            getattr(wifi.radio, _fn)()
+        except Exception:
+            pass
+    time.sleep(0.5)
+    last = None
+    for attempt in range(1, 8):
+        try:
+            print('acidducky: starting AP "%s" (attempt %d)' % (AP_SSID, attempt))
+            wifi.radio.start_ap(ssid=AP_SSID, password=AP_PASSWORD)
+            try:
+                wifi.radio.start_dhcp_ap()      # hand out leases to clients that ask
+            except Exception as e:
+                print('acidducky: dhcp-ap note (client can use static IP):', e)
+            print('acidducky: AP up at', wifi.radio.ipv4_address_ap)
             return
         except Exception as e:
             last = e
-            print('acidducky: wifi attempt %d failed - %s' % (attempt, e))
+            print('acidducky: AP start attempt %d failed - %s' % (attempt, e))
             time.sleep(2)
-    raise RuntimeError('wifi connect failed after 8 attempts: %s' % last)
+    raise RuntimeError('AP start failed after 5 attempts: %s' % last)
 
 
 def main():
-    _connect_wifi()
-    server_obj = mdns.Server(wifi.radio)
-    server_obj.hostname = HOSTNAME
-    try:
-        server_obj.advertise_service(service_type='_acidducky', protocol='_tcp', port=PORT)
-    except Exception as e:
-        print('acidducky: mDNS advertise failed (still reachable by IP):', e)
-
+    _start_ap()
     pool = socketpool.SocketPool(wifi.radio)
     sock = pool.socket(pool.AF_INET, pool.SOCK_STREAM)
     sock.setsockopt(pool.SOL_SOCKET, pool.SO_REUSEADDR, 1)
     sock.bind(('0.0.0.0', PORT))
     sock.listen(1)
-    print('acidducky: BadUSB server up on %s.local:%d' % (HOSTNAME, PORT))
+    print('acidducky: BadUSB server up on %s:%d (AP "%s")' % (wifi.radio.ipv4_address_ap, PORT, AP_SSID))
 
     buf = bytearray(4096)
     while True:

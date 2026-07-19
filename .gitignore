@@ -38,3 +38,4 @@ firmware/**/build/
 apple2.py
 __pycache__/
 *.pyc
+ssh_check_sync.py

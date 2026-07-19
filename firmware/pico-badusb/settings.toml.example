@@ -1,7 +1,15 @@
-# Acid Zero - Pico 2 W BadUSB WiFi credentials.
-# Copy this file to the CIRCUITPY drive as `settings.toml` and fill in your WiFi
-# (the SAME network the Raspberry Pi is on, so the Pi can reach acidducky.local).
-# CircuitPython reads these at boot; code.py connects with them.
+# Acid Zero - Pico 2 W BadUSB (AP MODE) - OPTIONAL.
+#
+# The Pico hosts its OWN WiFi access point, so it needs NO external WiFi and this
+# file is OPTIONAL. Copy it to the CIRCUITPY drive as `settings.toml` ONLY if you
+# want to change the default AP name / password.
+#
+# Defaults (baked into code.py): SSID "AcidZero-Duck", password "acidzero1337".
+# If you change them here, ALSO update AP_SSID / AP_PSK in launcher/acid_badusb.py
+# so the Pi joins the right AP.
+#
+# Do NOT set CIRCUITPY_WIFI_SSID/PASSWORD here - that makes CircuitPython auto-join
+# a station network at boot, which fights AP mode.
 
-CIRCUITPY_WIFI_SSID = "YOUR_WIFI_SSID"
-CIRCUITPY_WIFI_PASSWORD = "YOUR_WIFI_PASSWORD"
+ACIDZERO_AP_SSID = "AcidZero-Duck"
+ACIDZERO_AP_PASSWORD = "acidzero1337"   # WPA2: must be at least 8 characters

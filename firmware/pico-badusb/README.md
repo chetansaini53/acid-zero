@@ -1,12 +1,14 @@
 # Acid Zero — BadUSB co-processor (Raspberry Pi Pico 2 W)
 
-A **WiFi-controlled Rubber Ducky**. The Pico 2 W is a USB HID keyboard plugged into
-the **target**; it joins your WiFi as `acidducky.local`. The Pi (Acid Zero) sends a
-**Flipper-compatible DuckyScript** over WiFi and the Pico types it into the target.
+A **self-contained WiFi Rubber Ducky**. The Pico 2 W is a USB HID keyboard plugged
+into the **target**, and it **hosts its own WiFi access point** — it needs no
+external network, so it works **anywhere** (home, the field, a client site). The
+Pi (Acid Zero) joins that AP on a dedicated adapter, sends **Flipper-compatible
+DuckyScript**, and the Pico types it into the target.
 
 ```
-[Pi / Acid Zero]  --WiFi-->  [Pico 2 W: HID keyboard + WiFi server]  --USB-->  [TARGET]
-   acid_badusb.py             code.py (DuckyScript interpreter)                keystrokes
+[Pi / Acid Zero]  --joins Pico's AP-->  [Pico 2 W: HID keyboard + AP + server]  --USB-->  [TARGET]
+   acid_badusb.py   AcidZero-Duck (WPA2)   code.py @ 192.168.4.1:1337                     keystrokes
 ```
 
 > ⚠️ **AUTHORIZED USE ONLY** — inject keystrokes only into machines you own or are
@@ -22,41 +24,47 @@ It reboots as a `CIRCUITPY` drive.
 
 ## 2. Copy the framework onto CIRCUITPY
 
-Onto the `CIRCUITPY` drive:
-
 | From | To (CIRCUITPY) |
 |------|----------------|
 | `code.py` | `code.py` |
-| `settings.toml.example` → fill in WiFi | `settings.toml` |
-| the **`adafruit_hid`** folder from the [CircuitPython library bundle](https://circuitpython.org/libraries) | `lib/adafruit_hid/` |
+| the **`adafruit_hid`** folder from the [CircuitPython library bundle](https://circuitpython.org/libraries) — **match your CircuitPython major version** | `lib/adafruit_hid/` |
+| `settings.toml.example` *(optional — only to rename the AP / change its password)* | `settings.toml` |
 | `boot.py` *(optional — stealth, see the file)* | `boot.py` |
 
-`wifi`, `socketpool`, `mdns`, `usb_hid` are built into CircuitPython — only
-`adafruit_hid` needs copying.
+`wifi`, `socketpool`, `usb_hid` are built into CircuitPython — only `adafruit_hid`
+needs copying. **No WiFi credentials are required** — the Pico makes its own AP.
 
-## 3. Wire it up
+Default AP: **SSID `AcidZero-Duck`**, **password `acidzero1337`** (WPA2). Change them
+in `settings.toml` (and keep `AP_SSID`/`AP_PSK` in the Pi's `acid_badusb.py` in sync).
 
-- **Operation:** Pico 2 W → USB → the **target** machine (your own laptop for testing).
-  On power it joins your WiFi and prints its IP on the serial console.
-- The Pi must be on the **same WiFi**. It reaches the Pico at `acidducky.local:1337`.
+## 3. Operate
+
+- Pico 2 W → USB → the **target** machine (your own laptop for testing). On power it
+  brings up the `AcidZero-Duck` AP at **192.168.4.1** and starts the BadUSB server.
+- On the Pi, open the **Bad USB** app → **CONNECT**. The Pi joins the AP on a
+  **dedicated spare adapter** (static `192.168.4.2`, no default route), so its main
+  uplink keeps SSH + internet the whole time. **DISCONNECT** releases that adapter.
 
 ## 4. Run a payload (from the Pi)
 
 DuckyScripts live in **`/home/ella3/acid_badusb/`** (`*.txt`) — drop your Flipper
-BadUSB scripts straight in. Then:
+BadUSB scripts straight in. After CONNECT:
 
 ```
-python3 /usr/local/bin/acid_badusb.py                       # ping + list scripts
-python3 /usr/local/bin/acid_badusb.py /home/ella3/acid_badusb/demo-notepad.txt
+python3 /usr/local/bin/acid_badusb.py connect                # join the Pico AP (wlan2)
+python3 /usr/local/bin/acid_badusb.py                        # ping + list scripts
+python3 /usr/local/bin/acid_badusb.py disconnect             # release the adapter
 ```
 
 …or from Python / the launcher app:
 
 ```python
-from acid_badusb import BadUSB
+from acid_badusb import BadUSB, link_connect, link_disconnect
+link_connect()                             # join the Pico's AP on the worker adapter
 bu = BadUSB()
-bu.ping()                                  # is the Pico online?
+bu.ping()                                  # is the Pico reachable @ 192.168.4.1:1337?
 bu.run_script('/home/ella3/acid_badusb/demo-notepad.txt')
+link_disconnect()
 ```
 
 ## 5. DuckyScript reference (Flipper/Hak5 compatible)
@@ -79,14 +87,16 @@ Layout is **US** (`KeyboardLayoutUS`). For other layouts swap the layout import 
 
 ## 6. Verify
 
-Serial console (Mu / `screen /dev/ttyACM* 115200` on the target-side, or the Pi if
-the Pico is on the Pi) shows:
+Serial console (Mu / `screen /dev/ttyACM* 115200`) on the target side shows:
 
 ```
-acidducky: connecting to <ssid>
-acidducky: IP <ip>
-acidducky: BadUSB server up on acidducky.local:1337
+acidducky: starting AP "AcidZero-Duck" (attempt 1)
+acidducky: AP up at 192.168.4.1
+acidducky: BadUSB server up on 192.168.4.1:1337 (AP "AcidZero-Duck")
 ```
 
-From the Pi, `acid_badusb.py` → `OK - Pico BadUSB online`. Then run `demo-notepad.txt`
+From the Pi: **CONNECT** in the app → `LINK: ONLINE`. Then run `demo-notepad.txt`
 against your own machine to confirm the HID path end-to-end.
+
+> **Note (Pico W radio):** the CYW43 can flake on its first association/AP-start after a
+> cold boot — `code.py` retries, so give it ~10–20 s to come up before CONNECT.
