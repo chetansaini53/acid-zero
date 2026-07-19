@@ -30,7 +30,7 @@ This is a portfolio / proof-of-work project: **embedded systems and systems prog
 | **IR** (transmit / receive) | capture + **raw replay** (works with AC remotes too) · Flipper-style Remotes/Buttons library · `.ir` file interop · on the same ESP32 co-processor | ✅ **Working** |
 | NFC / RFID (PN532) | read / emulate tags — PN532 over I²C (code already probes `i2c-1 @0x24`) | 🗓️ Planned |
 
-> The Sub-GHz radio runs on a dedicated **ESP32 co-processor** (CC1101) talking to the Pi over USB serial — hardware-precise RMT capture, modulation-aware record/replay, all driven from the on-device touch UI. The ESP32 firmware (source **+ a ready-to-flash binary**) ships in [`firmware/`](firmware/) — flash it in one command.
+> The Sub-GHz radio **and IR** run on a single dedicated **ESP32 co-processor** (CC1101 + IR TX/RX) talking to the Pi over USB serial — hardware-precise RMT capture, modulation-aware record/replay, all driven from the on-device touch UI. The ESP32 firmware (source **+ a ready-to-flash binary**) ships in [`firmware/`](firmware/) — flash it in one command.
 
 ---
 
@@ -222,8 +222,9 @@ security-**education** tool.
 | Display | **ILI9486** 480×320 SPI TFT — `fbtft` `piscreen` overlay, **SPI0 @ 16 MHz** → `/dev/fb1` |
 | Touch | **ADS7846** SPI resistive, read via raw `evdev` |
 | Wi-Fi / BLE | Onboard Broadcom Wi-Fi + BT, plus **4× USB Wi-Fi dongles** via a powered hub |
-| Radio co-processor | **ESP32-WROOM-32** (dual-core) — owns the CC1101 over SPI, USB-serial to the Pi |
+| Radio / IR co-processor | **ESP32-WROOM-32** (dual-core) — owns the CC1101 (SPI) **and IR TX/RX**, one USB-serial link to the Pi |
 | Sub-GHz | **CC1101** (E07-M1101D) — 300–928 MHz ASK/OOK + 2-FSK, on the ESP32's SPI |
+| IR | **IR LED + TSOP receiver** — 38 kHz capture / replay on the ESP32 (GPIO13 TX · GPIO14 RX) |
 
 Wi-Fi roles are bound by USB **VID:PID** so a `wlanN` reshuffle on reboot never breaks them:
 
@@ -242,11 +243,12 @@ Everything is commodity, off-the-shelf hardware — no custom PCB. Substitutes i
 |------|-----------|---------------------|
 | SBC | Raspberry Pi 3B+ (1 GB) | any Pi with a 40-pin GPIO header |
 | Display + touch | ILI9486 3.5" SPI TFT (480×320) + ADS7846 | the common "RPi 3.5 inch" resistive shield |
-| Radio co-processor | ESP32-WROOM-32 dev board | any ESP32 with ≥ 4 MB flash |
+| Radio / IR co-processor | ESP32-WROOM-32 dev board | any ESP32 with ≥ 4 MB flash — runs CC1101 **and** IR |
 | Sub-GHz transceiver | CC1101 — E07-M1101D + SMA antenna | use an antenna for a band that is **legal to TX** in your region |
+| IR transmitter / receiver | IR LED (+ driver transistor) + TSOP/VS1838 receiver | 38 kHz; capture + replay remotes |
 | High-gain Wi-Fi | ALFA-class USB adapters (MT7612U / RTL8812AU / RTL8821AU / RTL8188EUS) | monitor + injection capable; high-gain antennas |
 | Power | powered USB hub | the radios need clean current — don't bus-power them off the Pi |
-| Wiring | jumper wires + GPIO expansion board | for the CC1101 ↔ ESP32 SPI hookup |
+| Wiring | jumper wires + GPIO expansion board | for the CC1101 (SPI) + IR hookup to the ESP32 |
 
 > **Flashing the co-processor:** wiring diagram + one-command flash (prebuilt binary or build-from-source) are in **[`firmware/README.md`](firmware/README.md)**.
 
@@ -283,7 +285,7 @@ Built on the jayofelony pwnagotchi base OS; paths assume the pwnagotchi default 
 - **Wi-Fi:** bettercap (via pwnagotchi), aircrack-ng suite, hcxtools (`hcxpcapngtool`), hostapd, dnsmasq
 - **Bluetooth:** bluez (`btmgmt` / `btmon`), raw HCI sockets
 - **Display:** Linux `fbtft`
-- **Sub-GHz co-processor:** flash the ESP32 (CC1101) with one command — prebuilt binary or build-from-source: **[`firmware/README.md`](firmware/README.md)**
+- **Sub-GHz + IR co-processor:** flash the ESP32 (CC1101 + IR) with one command — prebuilt binary or build-from-source: **[`firmware/README.md`](firmware/README.md)**
 
 Full setup, flashing, overlay configuration, and service install are in **[INSTALL.md](INSTALL.md)**.
 
@@ -297,6 +299,9 @@ apps/packets.py                              # in-process plugin example
 apps/subghz.py                               # Sub-GHz UI plugin (capture/decode/add-manually)
 apps/subghz_proto.py                         # OOK protocol codec (decode/encode/verify, pure)
 apps/test_subghz_proto.py                    # codec unit tests (20 cases, no radio needed)
+apps/ir.py                                   # IR UI plugin (Flipper-style Remotes/Buttons + raw replay)
+apps/ir_proto.py                             # Flipper .ir codec + protocol encode (NEC/Samsung)
+apps/modules.py                              # live hardware status (ESP32/CC1101/IR/GPS probes)
 apps/hello-native/{app.json,hello.py}        # native-plugin template + contract
 lib/acid-ble/
   hci.py                                     # raw HCI socket layer
@@ -305,10 +310,11 @@ lib/acid-ble/
 scripts/acid-{deauth,evilportal,handshake,packets,hs-clean,flood}.sh
 scripts/acid-{ble-scan,portal-server,hwref}.py   # hwref = zero-dep PDF/HTML writer
 systemd/{acidzero.service,acid-hs-clean.service,acid-hs-clean.timer}
-firmware/esp32-cc1101/esp32-cc1101.ino       # ESP32 Sub-GHz co-processor firmware (source)
-firmware/esp32-cc1101/prebuilt/*.merged.bin  # ready-to-flash ESP32 image (flash at 0x0)
-firmware/{flash-windows.bat,flash-pi.sh}     # one-command ESP32 flashing
-firmware/README.md                           # CC1101 wiring + flashing guide
+firmware/esp32-allinone/esp32-allinone.ino   # ESP32 co-processor firmware — CC1101 + IR (source)
+firmware/esp32-allinone/prebuilt/*.merged.bin # ready-to-flash image (flash at 0x0)
+firmware/esp32-cc1101/, firmware/esp32-ir/   # legacy single-purpose firmwares (reference/fallback)
+firmware/flash-allinone-{windows.bat,pi.sh}  # one-command ESP32 flashing
+firmware/README.md                           # CC1101 + IR wiring + flashing guide
 docs/hardware-reference.{html,pdf}
 docs/{device,setup}.jpg                      # real-hardware photos
 docs/architecture.svg                        # system architecture diagram
