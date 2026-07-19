@@ -1,0 +1,9 @@
+{
+  "type": "native",
+  "name": "Wardrive CSV",
+  "icon": "pin",
+  "color": [60, 200, 140],
+  "exec": "reader.py",
+  "author": "acid",
+  "desc": "Reads WigleWifi wardrive CSV logs into a scrollable table - fixed column header + UP/DOWN pagination. A second native-plugin sample."
+}
