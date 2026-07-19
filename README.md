@@ -17,20 +17,21 @@ This is a portfolio / proof-of-work project: **embedded systems and systems prog
 
 | Module | Capability | Status |
 |--------|-----------|--------|
-| **Sub-GHz** (CC1101 + ESP32 co-processor) | Frequency Analyzer · OOK record / replay · modulation profiles (AM270/AM650/FSK) · named save library · live waveform UI | ✅ **Working** |
-| WiFi Hunter | live AP/client scan, deauth (authorized), connect — via bettercap | ✅ Working |
-| Radar (defensive suite) | deauth / BLE-spam / Flipper / evil-twin **detectors** (passive) | ✅ Working |
-| Handshake Hunter | WPA handshake capture → Hashcat `.22000` | ✅ Working |
-| BLE Scan / BLE Spam | rich device identification / advertising-spam demo | ✅ Working |
-| Captive Portal Lab | rogue-AP + captive portal (demo; credential capture **off by default**) | ✅ Working |
-| Pwnagotchi mirror / Live Packets | live agent display / read-only 802.11 recon | ✅ Working |
-| Two-tier plugin runtime | in-process Python **+** native (C/C++/Rust/Go) plugins | ✅ Working |
-| **Sub-GHz protocol decode** | EV1527 / Princeton 24-bit decode + round-trip verify; generic "PWM Nbit" fallback | ✅ **Working** |
-| **Sub-GHz "Add Manually"** | build a replayable EV1527 frame from a hex key, on-device | ✅ **Working** |
-| **IR** (transmit / receive) | capture + **raw replay** (works with AC remotes too) · Flipper-style Remotes/Buttons library · `.ir` file interop · on the same ESP32 co-processor | ✅ **Working** |
-| NFC / RFID (PN532) | read / emulate tags — PN532 over I²C (code already probes `i2c-1 @0x24`) | 🗓️ Planned |
+| **WiFi Hunter** | Live AP / client scan (signal · channel · encryption · client count) with sort / filter / multi-select / pagination; **deauth** (authorized) + connect, driven through the bettercap REST API | ✅ **Working** |
+| **Radar** (defensive suite) | Passive **detectors** — deauth floods, BLE spam, Flipper beacons, evil-twin / rogue-AP; the defensive counterpart to every offensive screen | ✅ **Working** |
+| **Handshake Hunter** | WPA / WPA2 handshake capture (`airodump-ng` + `aireplay-ng`) → Hashcat **`.22000`** via `hcxpcapngtool` | ✅ **Working** |
+| **BLE Scan / BLE Spam** | Rich BLE device ID (Company-ID / OUI / Apple Continuity / Google Fast-Pair → human labels like *"AirPods Pro"*) · advertising-spam demo over **raw HCI sockets** | ✅ **Working** |
+| **Captive Portal Lab** | Rogue-AP + captive portal (`hostapd` + `dnsmasq` DNS-hijack + Python portal); credential capture **off by default** (masked count only, own-lab flag gated) | ✅ **Working** |
+| **Pwnagotchi mirror / Live Packets** | Live pwnagotchi `/ui` frame (theme-colorized) · read-only 802.11 recon — frame-type breakdown, top talkers, probe-request leaks | ✅ **Working** |
+| **Two-tier plugin runtime** | In-process Python plugins (`META` + `draw` / `handle_touch`) **+** native-binary plugins (`app.json` + any-language exec, fullscreen) | ✅ **Working** |
+| **Sub-GHz** (CC1101 + ESP32 co-processor) | Frequency Analyzer · OOK record / replay · modulation profiles (AM270/AM650/FSK) · EV1527 / Princeton 24-bit **decode + round-trip verify** · **"Add Manually"** (build a replayable frame from a hex key) · named save library · live waveform UI | ✅ **Working** |
+| **IR** (ESP32 co-processor) | 38 kHz capture + **raw replay** (works with AC remotes too) · Flipper-style **Remotes / Buttons** library · `.ir` file interop · nested-folder browser · shares the ESP32 with the CC1101 | ✅ **Working** |
+| **Bad USB** (Pico 2 W HID co-processor) | WiFi-controlled keystroke injection — the Pico **hosts its own WPA2 access point** (self-contained: no target network, works in the field), runs a **Flipper-compatible DuckyScript** interpreter, and types payloads into the plugged-in target over USB HID. Flipper-style **nested folder browser** for payloads; the Pi joins the AP on a **dedicated Wi-Fi adapter** (static IP, no default route) so SSH + internet stay up; per-attack **detect / defend** Learn screen | ✅ **Working** |
+| **NFC / RFID** (PN532) | read / emulate tags — PN532 over I²C (code already probes `i2c-1 @0x24`) | 🗓️ **Planned** |
 
 > The Sub-GHz radio **and IR** run on a single dedicated **ESP32 co-processor** (CC1101 + IR TX/RX) talking to the Pi over USB serial — hardware-precise RMT capture, modulation-aware record/replay, all driven from the on-device touch UI. The ESP32 firmware (source **+ a ready-to-flash binary**) ships in [`firmware/`](firmware/) — flash it in one command.
+>
+> **Bad USB** runs on a **second co-processor — a Raspberry Pi Pico 2 W (CircuitPython)** that hosts its *own* Wi-Fi access point and injects keystrokes over USB HID, so it depends on no target network and works anywhere. The Pi joins that AP on a dedicated adapter, keeping its main uplink for SSH/internet. Firmware in [`firmware/pico-badusb/`](firmware/pico-badusb/).
 
 ---
 
@@ -160,6 +161,7 @@ Each app is a screen in the UI.
 | **BLE Scan** | Rich BLE device identification — decodes advertising reports (manufacturer Company-ID → vendor, OUI, name, GAP appearance, Apple Continuity model, Google Fast-Pair model) into human labels like *"AirPods Pro (Apple)"* or *"iPhone/iPad/Mac"*. Lookup tables compiled from the Bluetooth SIG Company-ID list, the IEEE OUI registry, and reverse-engineered Apple Continuity / Google Fast-Pair model IDs. |
 | **BLE Spam** | BLE advertising spam (Apple / Google / Samsung / Microsoft proximity-pairing popups) over raw HCI sockets; modular per-vendor payload files. Educational demonstration of BLE advertising abuse. |
 | **Live Packets** | Read-only 802.11 frame recon — frame-type breakdown, top talkers, probe-request leaks. |
+| **Bad USB** | WiFi-controlled USB **HID keystroke injection** via a **Raspberry Pi Pico 2 W** co-processor. The Pico hosts its own WPA2 access point (self-contained — no target network, works in the field) and runs a **Flipper-compatible DuckyScript** interpreter (`STRING` / `STRINGLN` / `DELAY` / `DEFAULT_DELAY` / `REPEAT` / modifier combos like `GUI r`, `CTRL-ALT-DEL` / all named keys), typing payloads into the plugged-in target. The Pi joins the AP on a **dedicated Wi-Fi adapter** (static IP, `never-default` route) so SSH + internet stay up the whole time. Payloads live in `/home/ella3/acid_badusb/` and **browse as nested folders** (lazy per-folder scan, like the IR app); an **(i) Learn** screen pairs the attack with how to detect + defend against it. Educational / authorized-use only. |
 | **Pwnagotchi mirror** | Renders the live pwnagotchi display by fetching its rendered web `/ui` frame and theme-colorizing it — integrates the underlying AI-agent base OS. |
 | **Hardware Info** | Live on-device hardware reference (board, display bus, touch, radios, free I2C/SPI buses). |
 | **System & Power** | Start/stop services, restart the UI, reboot / shutdown. |
@@ -225,6 +227,7 @@ security-**education** tool.
 | Radio / IR co-processor | **ESP32-WROOM-32** (dual-core) — owns the CC1101 (SPI) **and IR TX/RX**, one USB-serial link to the Pi |
 | Sub-GHz | **CC1101** (E07-M1101D) — 300–928 MHz ASK/OOK + 2-FSK, on the ESP32's SPI |
 | IR | **IR LED + TSOP receiver** — 38 kHz capture / replay on the ESP32 (GPIO13 TX · GPIO14 RX) |
+| Bad USB co-processor | **Raspberry Pi Pico 2 W** (RP2350 + CYW43 Wi-Fi) — CircuitPython USB HID keyboard that **hosts its own Wi-Fi AP**; reached over a dedicated Pi adapter |
 
 Wi-Fi roles are bound by USB **VID:PID** so a `wlanN` reshuffle on reboot never breaks them:
 
@@ -233,7 +236,7 @@ Wi-Fi roles are bound by USB **VID:PID** so a `wlanN` reshuffle on reboot never 
 | Monitor + injection | MediaTek **MT7612U** |
 | Rogue AP (Captive Portal Lab) | Realtek **RTL8812AU** |
 | Client / SSH uplink | Realtek **RTL8821AU** |
-| Auxiliary | Realtek **RTL8188EUS** |
+| Auxiliary / **Bad USB link** | Realtek **RTL8188EUS** — joins the Pico's AP on demand (static IP, no default route) |
 
 ### Bill of materials / sourcing
 
@@ -246,6 +249,7 @@ Everything is commodity, off-the-shelf hardware — no custom PCB. Substitutes i
 | Radio / IR co-processor | ESP32-WROOM-32 dev board | any ESP32 with ≥ 4 MB flash — runs CC1101 **and** IR |
 | Sub-GHz transceiver | CC1101 — E07-M1101D + SMA antenna | use an antenna for a band that is **legal to TX** in your region |
 | IR transmitter / receiver | IR LED (+ driver transistor) + TSOP/VS1838 receiver | 38 kHz; capture + replay remotes |
+| Bad USB co-processor | Raspberry Pi **Pico 2 W** | any RP2040/RP2350 board with Wi-Fi + USB-device mode; runs CircuitPython |
 | High-gain Wi-Fi | ALFA-class USB adapters (MT7612U / RTL8812AU / RTL8821AU / RTL8188EUS) | monitor + injection capable; high-gain antennas |
 | Power | powered USB hub | the radios need clean current — don't bus-power them off the Pi |
 | Wiring | jumper wires + GPIO expansion board | for the CC1101 (SPI) + IR hookup to the ESP32 |
@@ -302,6 +306,8 @@ apps/test_subghz_proto.py                    # codec unit tests (20 cases, no ra
 apps/ir.py                                   # IR UI plugin (Flipper-style Remotes/Buttons + raw replay)
 apps/ir_proto.py                             # Flipper .ir codec + protocol encode (NEC/Samsung)
 apps/modules.py                              # live hardware status (ESP32/CC1101/IR/GPS probes)
+apps/badusb.py                               # Bad USB UI plugin (Pico-AP CONNECT/DISCONNECT + DuckyScript folder browser)
+launcher/acid_badusb.py                      # Bad USB client + Pico-AP link manager (nmcli, dedicated adapter)
 apps/hello-native/{app.json,hello.py}        # native-plugin template + contract
 lib/acid-ble/
   hci.py                                     # raw HCI socket layer
@@ -315,6 +321,9 @@ firmware/esp32-allinone/prebuilt/*.merged.bin # ready-to-flash image (flash at 0
 firmware/esp32-cc1101/, firmware/esp32-ir/   # legacy single-purpose firmwares (reference/fallback)
 firmware/flash-allinone-{windows.bat,pi.sh}  # one-command ESP32 flashing
 firmware/README.md                           # CC1101 + IR wiring + flashing guide
+firmware/pico-badusb/code.py                 # Pico 2 W Bad USB firmware — AP mode + DuckyScript engine (CircuitPython)
+firmware/pico-badusb/{boot.py,settings.toml.example,payloads/}  # stealth boot · AP config · Flipper .txt payloads
+firmware/pico-badusb/README.md               # Pico flashing + AP-mode setup guide
 docs/hardware-reference.{html,pdf}
 docs/{device,setup}.jpg                      # real-hardware photos
 docs/architecture.svg                        # system architecture diagram
