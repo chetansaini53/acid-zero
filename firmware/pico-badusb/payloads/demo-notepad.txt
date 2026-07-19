@@ -1,0 +1,11 @@
+REM Acid Zero BadUSB - harmless demo (Windows): open Notepad and type a line.
+REM Flipper/Hak5 DuckyScript syntax - drop your own .txt scripts next to this one.
+REM AUTHORIZED / own-machine test only.
+DEFAULT_DELAY 40
+GUI r
+DELAY 500
+STRING notepad
+ENTER
+DELAY 800
+STRINGLN Acid Zero BadUSB - authorized test. If you can read this, the HID path works.
+STRINGLN Pico 2 W typed this over WiFi from the Pi.

@@ -36,3 +36,5 @@ ssh_debug.py
 # ESP32 firmware build output (keep the flashable prebuilt/ bin, drop build/)
 firmware/**/build/
 apple2.py
+__pycache__/
+*.pyc

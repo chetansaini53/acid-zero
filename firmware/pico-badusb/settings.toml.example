@@ -1,0 +1,7 @@
+# Acid Zero - Pico 2 W BadUSB WiFi credentials.
+# Copy this file to the CIRCUITPY drive as `settings.toml` and fill in your WiFi
+# (the SAME network the Raspberry Pi is on, so the Pi can reach acidducky.local).
+# CircuitPython reads these at boot; code.py connects with them.
+
+CIRCUITPY_WIFI_SSID = "YOUR_WIFI_SSID"
+CIRCUITPY_WIFI_PASSWORD = "YOUR_WIFI_PASSWORD"
