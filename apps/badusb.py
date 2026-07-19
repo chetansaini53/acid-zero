@@ -1,13 +1,15 @@
 # Acid Zero plugin - "Bad USB": WiFi-controlled HID injection via a Pico 2 W.
 # The Pico hosts its OWN access point (AcidZero-Duck); this app joins it on a
 # dedicated spare adapter (wlan2) via CONNECT, then sends Flipper-compatible
-# DuckyScript payloads (/home/ella3/acid_badusb/*.txt) to the Pico at
-# 192.168.4.1:1337. The Pi's main uplink (wlan1) keeps SSH + internet the whole
-# time. Self-contained - works anywhere, no per-location WiFi creds needed.
+# DuckyScript payloads to the Pico at 192.168.4.1:1337. The Pi's main uplink
+# (wlan1) keeps SSH + internet the whole time. Self-contained - works anywhere.
 #
-# Always-on AUTHORIZED-USE banner + an (i) educational Learn screen (what it is,
-# why it's here, how to detect/defend). Educational / own-lab / authorized-device
-# only. See ETHICS.md.
+# Payloads live in /home/ella3/acid_badusb/ and are browsed as nested FOLDERS,
+# one directory at a time (same lazy model as the IR app - a pasted-in payload
+# pack can be thousands of files deep, so only the open folder is ever scanned).
+#
+# Always-on AUTHORIZED-USE banner + an (i) educational Learn screen. Educational
+# / own-lab / authorized-device only. See ETHICS.md.
 import os, sys, threading
 for _p in ('/usr/local/bin', '/usr/local/lib/acid-apps', '/home/ella3'):
     if _p not in sys.path:
@@ -34,13 +36,17 @@ except Exception:
 
 META = {'name': 'Bad USB', 'icon': 'badusb', 'color': (210, 90, 90)}
 
+SCRIPTS_DIR = '/home/ella3/acid_badusb'    # drop Flipper .txt DuckyScripts (and folders) here
+
 _view = 'main'          # main | info
-_scripts = []            # [(path, name), ...]
-_sel = -1                 # selected script index
-_page = 0
+_browse_rel = ''         # current folder, relative to SCRIPTS_DIR ('' = root)
+_browse_entries = []      # [(is_dir, abs_path, name, count), ...] of the CURRENT folder only
+_browse_page = 0
 _PER_PAGE = 4
+_sel_path = None          # selected .txt payload (abs path) - persists across nav
+_sel_name = ''
 _link = 'idle'            # idle | connecting | online | offline | disconnecting
-_status = 'tap CONNECT to reach the Pico'
+_status = 'CONNECT, then pick a payload'
 _busy = False
 
 
@@ -53,18 +59,68 @@ def _set(ctx, s):
         pass
 
 
-def _refresh_scripts():
-    global _scripts, _sel
-    try:
-        _scripts = BadUSB.list_scripts() if BadUSB else []
-    except Exception:
-        _scripts = []
-    if _sel >= len(_scripts):
-        _sel = -1
-
-
 def _spawn(fn, *a):
     threading.Thread(target=fn, args=a, daemon=True).start()
+
+
+# ---------- lazy folder browser (same model as the IR app) ----------
+def _rel_join(rel, name):
+    return (rel + '/' + name) if rel else name
+
+
+def _rel_up(rel):
+    return rel.rsplit('/', 1)[0] if '/' in rel else ''
+
+
+def _browse_abs(rel):
+    return os.path.join(SCRIPTS_DIR, *rel.split('/')) if rel else SCRIPTS_DIR
+
+
+def _refresh_browse():
+    """Scan ONE directory (the open folder) - never the whole tree, so a huge
+    payload pack never freezes the UI."""
+    global _browse_entries
+    out = []
+    try:
+        os.makedirs(SCRIPTS_DIR, exist_ok=True)
+        base = _browse_abs(_browse_rel)
+        with os.scandir(base) as it:
+            items = sorted(it, key=lambda e: (not e.is_dir(), e.name.lower()))
+        for e in items:
+            try:
+                if e.is_dir():
+                    with os.scandir(e.path) as sub:
+                        n = sum(1 for _ in sub)
+                    out.append((True, e.path, e.name, n))
+                elif e.name.lower().endswith('.txt'):
+                    out.append((False, e.path, e.name[:-4], 0))
+            except Exception:
+                pass
+    except Exception:
+        pass
+    _browse_entries = out
+
+
+def _paged(count, page, per_page):
+    total = max(1, (count + per_page - 1) // per_page)
+    page = min(max(page, 0), total - 1)
+    return page, total, page * per_page
+
+
+def _draw_page_bar(d, ctx, y, page, total):
+    ctx.rr(d, (10, y, 130, y + 22), fill=ctx.TILE, outline=ctx.LINE, w=1, r=6)
+    ctx.ct(d, 70, y + 11, '< PREV', ctx.F_SM, ctx.FG if page > 0 else ctx.DIM)
+    ctx.ct(d, 240, y + 11, '%d / %d' % (page + 1, total), ctx.F_SM, ctx.FG)
+    ctx.rr(d, (350, y, 470, y + 22), fill=ctx.TILE, outline=ctx.LINE, w=1, r=6)
+    ctx.ct(d, 410, y + 11, 'NEXT >', ctx.F_SM, ctx.FG if page < total - 1 else ctx.DIM)
+
+
+def _touch_page_bar(tx, page, total, ctx):
+    if tx <= 130 and page > 0 and ctx.debounce(0.25):
+        return page - 1
+    if tx >= 350 and page < total - 1 and ctx.debounce(0.25):
+        return page + 1
+    return None
 
 
 # ---------- workers (off the UI thread) ----------
@@ -134,26 +190,24 @@ def _w_run(ctx, path, name):
 
 # ---------- lifecycle ----------
 def on_enter(ctx):
-    global _view
+    global _view, _browse_rel, _browse_page
     _view = 'main'
-    _refresh_scripts()
+    _browse_rel = ''
+    _browse_page = 0
+    _refresh_browse()
     _spawn(_w_probe, ctx)
     ctx.mark_dirty()
 
 
 # ---------- view: MAIN ----------
-def _pages():
-    return max(1, (len(_scripts) + _PER_PAGE - 1) // _PER_PAGE)
-
-
 def _draw_main(d, ctx):
     ctx.topbar(d, 'BAD USB')
     ctx.rr(d, (418, 4, 472, 24), outline=ctx.ACC, w=1, r=8)
     ctx.ct(d, 445, 14, '(i) info', ctx.F_TINY, ctx.ACC)
 
     # AUTHORIZED-USE banner (always on)
-    ctx.rr(d, (6, 31, 474, 51), fill=(58, 22, 22), outline=(200, 70, 70), w=1, r=6)
-    ctx.ct(d, 240, 41, '! AUTHORIZED DEVICES ONLY  -  educational / own-lab', ctx.F_SM, (255, 165, 165))
+    ctx.rr(d, (6, 30, 474, 48), fill=(58, 22, 22), outline=(200, 70, 70), w=1, r=6)
+    ctx.ct(d, 240, 39, '! AUTHORIZED DEVICES ONLY - educational / own-lab', ctx.F_SM, (255, 165, 165))
 
     # link status line
     if _link == 'online':
@@ -166,98 +220,121 @@ def _draw_main(d, ctx):
         c, txt = (235, 80, 80), 'LINK: joined AP but Pico not answering'
     else:
         c, txt = (150, 160, 170), 'LINK: not connected  -  tap CONNECT'
-    d.ellipse((12, 60, 22, 70), fill=c)
-    ctx.lt(d, 30, 65, txt[:52], ctx.F_SM, c)
+    d.ellipse((12, 55, 21, 64), fill=c)
+    ctx.lt(d, 28, 60, txt[:54], ctx.F_TINY, c)
 
     # CONNECT / DISCONNECT
     busy = _link in ('connecting', 'disconnecting')
     conn_on = _link in ('idle', 'offline') and not busy
-    ctx.rr(d, (10, 78, 234, 100), fill=(30, 90, 60) if conn_on else (40, 48, 44),
+    ctx.rr(d, (10, 70, 234, 90), fill=(30, 90, 60) if conn_on else (40, 48, 44),
            outline=ctx.ACC if conn_on else ctx.LINE, w=1, r=6)
-    ctx.ct(d, 122, 89, 'CONNECT', ctx.F_SM, ctx.FG if conn_on else ctx.DIM)
+    ctx.ct(d, 122, 80, 'CONNECT', ctx.F_SM, ctx.FG if conn_on else ctx.DIM)
     disc_on = _link in ('online', 'offline') and not busy
-    ctx.rr(d, (246, 78, 470, 100), fill=(90, 45, 45) if disc_on else (40, 44, 44),
+    ctx.rr(d, (246, 70, 470, 90), fill=(90, 45, 45) if disc_on else (40, 44, 44),
            outline=(200, 90, 90) if disc_on else ctx.LINE, w=1, r=6)
-    ctx.ct(d, 358, 89, 'DISCONNECT', ctx.F_SM, ctx.FG if disc_on else ctx.DIM)
+    ctx.ct(d, 358, 80, 'DISCONNECT', ctx.F_SM, ctx.FG if disc_on else ctx.DIM)
 
-    # payload list
-    if not _scripts:
-        ctx.ct(d, 240, 150, 'no payloads yet', ctx.F_NM, ctx.DIM)
-        ctx.ct(d, 240, 172, 'drop Flipper .txt DuckyScripts into', ctx.F_SM, ctx.DIM)
-        ctx.ct(d, 240, 190, '/home/ella3/acid_badusb/', ctx.F_TINY, (150, 190, 240))
+    # browser: path bar + UP
+    nested = bool(_browse_rel)
+    path_txt = ('/payloads/' + _browse_rel) if nested else '/payloads/'
+    ctx.rr(d, (10, 95, 360, 115), fill=ctx.PANEL, outline=ctx.LINE, w=1, r=6)
+    ctx.lt(d, 18, 105, path_txt[:34], ctx.F_TINY, (150, 190, 240))
+    ctx.rr(d, (366, 95, 470, 115), fill=(45, 52, 68) if nested else (34, 38, 40), r=6)
+    ctx.ct(d, 418, 105, 'UP', ctx.F_SM, ctx.ACC if nested else ctx.DIM)
+
+    # entries (folders first, then .txt payloads)
+    LIST_TOP, ROW_H = 119, 27
+    if not _browse_entries:
+        ctx.ct(d, 240, 165, 'empty folder', ctx.F_NM, ctx.DIM)
+        ctx.ct(d, 240, 186, 'drop Flipper .txt DuckyScripts (+ folders) into', ctx.F_SM, ctx.DIM)
+        ctx.ct(d, 240, 202, '/home/ella3/acid_badusb/', ctx.F_TINY, (150, 190, 240))
     else:
-        y = 106
-        start = _page * _PER_PAGE
-        for i, (path, name) in enumerate(_scripts[start:start + _PER_PAGE]):
-            idx = start + i
-            selq = (idx == _sel)
-            ctx.rr(d, (10, y, 470, y + 24), fill=(40, 55, 42) if selq else ctx.TILE,
-                   outline=ctx.ACC if selq else ctx.LINE, w=1, r=6)
-            ctx.lt(d, 18, y + 12, name[:44], ctx.F_SM, ctx.FG)
-            if selq:
-                ctx.ct(d, 450, y + 12, 'SEL', ctx.F_TINY, ctx.ACC)
-            y += 27
-
-    # page bar
-    if len(_scripts) > _PER_PAGE:
-        pg, tot = _page, _pages()
-        ctx.ct(d, 60, 228, '< prev', ctx.F_SM, ctx.FG if pg > 0 else ctx.DIM)
-        ctx.ct(d, 240, 228, '%d / %d' % (pg + 1, tot), ctx.F_SM, ctx.DIM)
-        ctx.ct(d, 420, 228, 'next >', ctx.F_SM, ctx.FG if pg < tot - 1 else ctx.DIM)
+        page, total, start = _paged(len(_browse_entries), _browse_page, _PER_PAGE)
+        y = LIST_TOP
+        for is_dir, path, name, n in _browse_entries[start:start + _PER_PAGE]:
+            if is_dir:
+                ctx.rr(d, (10, y, 470, y + 24), fill=ctx.TILE, outline=ctx.LINE, w=1, r=6)
+                ctx.rr(d, (16, y + 7, 28, y + 18), fill=(90, 140, 225), r=4)
+                ctx.lt(d, 36, y + 12, name[:34], ctx.F_SM, ctx.FG)
+                ctx.lt(d, 398, y + 12, '%d item%s' % (n, '' if n == 1 else 's'), ctx.F_TINY, (150, 190, 240))
+            elif path == _sel_path:
+                # SELECTED: light background so the name stays readable
+                ctx.rr(d, (10, y, 470, y + 24), fill=(202, 227, 212), outline=(110, 205, 150), w=1, r=6)
+                ctx.lt(d, 18, y + 12, name[:40], ctx.F_SM, (16, 44, 28))
+                ctx.ct(d, 448, y + 12, 'SEL', ctx.F_TINY, (18, 95, 55))
+            else:
+                ctx.rr(d, (10, y, 470, y + 24), fill=ctx.TILE, outline=ctx.LINE, w=1, r=6)
+                ctx.lt(d, 18, y + 12, name[:44], ctx.F_SM, ctx.FG)
+            y += ROW_H
+        if total > 1:
+            _draw_page_bar(d, ctx, LIST_TOP + _PER_PAGE * ROW_H + 2, page, total)
 
     # RUN button
-    can_run = (_sel >= 0 and _link == 'online' and not _busy)
+    can_run = (_sel_path and _link == 'online' and not _busy)
     ctx.rr(d, (10, 256, 470, 298), fill=(205, 60, 60) if can_run else (70, 45, 45), r=8)
     ctx.ct(d, 240, 277, 'RUNNING...' if _busy else 'RUN ON TARGET', ctx.F_NM, (255, 240, 240))
-
     ctx.ct(d, 240, 310, _status[:58], ctx.F_TINY, ctx.DIM)
 
 
 def _touch_main(tx, ty, ctx):
-    global _view, _sel, _page, _busy
+    global _view, _browse_rel, _browse_page, _sel_path, _sel_name, _busy
     if ty <= 24 and tx >= 418 and ctx.debounce(0.3):
         _view = 'info'
         ctx.mark_dirty()
         return
     busy = _link in ('connecting', 'disconnecting')
-    # CONNECT / DISCONNECT row
-    if 78 <= ty <= 100 and not busy:
+    # CONNECT / DISCONNECT
+    if 70 <= ty <= 90 and not busy:
         if tx <= 234 and _link in ('idle', 'offline') and ctx.debounce(0.5):
             _spawn(_w_connect, ctx)
             return
         if tx >= 246 and _link in ('online', 'offline') and ctx.debounce(0.5):
             _spawn(_w_disconnect, ctx)
             return
-    # payload rows
-    if 106 <= ty <= 106 + _PER_PAGE * 27 and _scripts:
-        idx = _page * _PER_PAGE + (ty - 106) // 27
-        if 0 <= idx < len(_scripts) and ctx.debounce(0.25):
-            _sel = idx
-            _set(ctx, 'selected: %s' % _scripts[idx][1][:40])
+    # UP (exit directory)
+    if 95 <= ty <= 115 and tx >= 366 and _browse_rel and ctx.debounce(0.3):
+        _browse_rel = _rel_up(_browse_rel)
+        _browse_page = 0
+        _refresh_browse()
+        ctx.mark_dirty()
+        return
+    # entries
+    LIST_TOP, ROW_H = 119, 27
+    if _browse_entries:
+        page, total, start = _paged(len(_browse_entries), _browse_page, _PER_PAGE)
+        bar_y = LIST_TOP + _PER_PAGE * ROW_H + 2
+        if total > 1 and bar_y <= ty <= bar_y + 22:
+            newp = _touch_page_bar(tx, page, total, ctx)
+            if newp is not None:
+                _browse_page = newp
+                ctx.mark_dirty()
             return
-    # page nav
-    if len(_scripts) > _PER_PAGE and 220 <= ty <= 240:
-        if tx <= 130 and _page > 0 and ctx.debounce(0.25):
-            _page -= 1
-            ctx.mark_dirty()
-            return
-        if tx >= 350 and _page < _pages() - 1 and ctx.debounce(0.25):
-            _page += 1
-            ctx.mark_dirty()
-            return
+        if LIST_TOP <= ty <= LIST_TOP + _PER_PAGE * ROW_H:
+            idx = start + (ty - LIST_TOP) // ROW_H
+            if start <= idx < min(start + _PER_PAGE, len(_browse_entries)):
+                is_dir, path, name, n = _browse_entries[idx]
+                if is_dir and ctx.debounce(0.3):
+                    _browse_rel = _rel_join(_browse_rel, name)   # enter directory
+                    _browse_page = 0
+                    _refresh_browse()
+                    ctx.mark_dirty()
+                elif not is_dir and ctx.debounce(0.25):
+                    _sel_path = path
+                    _sel_name = name
+                    _set(ctx, 'selected: %s' % name[:38])
+                return
     # RUN
     if 256 <= ty <= 298 and ctx.debounce(0.5):
         if _busy:
             return
-        if _sel < 0:
+        if not _sel_path:
             _set(ctx, 'select a payload first')
             return
         if _link != 'online':
             _set(ctx, 'CONNECT to the Pico AP first')
             return
         _busy = True
-        path, name = _scripts[_sel]
-        _spawn(_w_run, ctx, path, name)
+        _spawn(_w_run, ctx, _sel_path, _sel_name)
         ctx.mark_dirty()
 
 
