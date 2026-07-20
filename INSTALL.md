@@ -49,8 +49,10 @@ sudo apt install -y python3-pil python3-numpy aircrack-ng hcxtools hostapd dnsma
 ## 4. Deploy the files
 
 ```
-# launcher
-sudo cp launcher/acidzero.py            /usr/local/bin/
+# launcher (acidzero.py + its sibling client libs: acid_ir.py, acid_subghz.py,
+# acid_gps.py, acid_badusb.py, acid_wifiroles.py - plugins import these by name,
+# expecting them next to acidzero.py)
+sudo cp launcher/*.py                    /usr/local/bin/
 # helper scripts
 sudo cp scripts/*.sh scripts/*.py       /usr/local/bin/
 sudo chmod +x /usr/local/bin/acid-*.sh /usr/local/bin/acid-*.py /usr/local/bin/acidzero.py

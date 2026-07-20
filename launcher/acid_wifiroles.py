@@ -37,14 +37,26 @@ ROLES = ('ssh', 'monitor', 'badusb')
 ROLE_LABEL = {'ssh': 'SSH + Internet', 'monitor': 'Pwnagotchi / Radar / Wardrive', 'badusb': 'Bad USB (Pico link)'}
 ROLE_SHORT = {'ssh': 'SSH', 'monitor': 'MON', 'badusb': 'DUCK'}
 
-# highest power / best range first - the default fill order for an unassigned
-# (or currently-unplugged) role. Keys are KERNEL DRIVER names (readlink of
-# .../device/driver), matching DRV2CHIP in acidzero.py - e.g. the MT7612U-based
-# Alfa adapter loads as driver "mt76x2u", not "mt7612u".
-PRIORITY = ['mt76x2u', 'rtl8812au', 'rtl8821au', 'rtl8xxxu', 'r8188eu', '8188eu', 'brcmfmac']
-CHIP_LABEL = {'mt76x2u': 'MT7612U (Alfa, dual-band)', 'rtl8812au': 'RTL8812AU (dual-band)',
-              'rtl8821au': 'RTL8821AU', 'rtl8xxxu': 'RTL8188EUS', 'r8188eu': 'RTL8188EUS',
-              '8188eu': 'RTL8188EUS', 'brcmfmac': 'Onboard'}
+# Chipset keys are KERNEL DRIVER names (readlink of .../device/driver), matching
+# DRV2CHIP in acidzero.py - the MT7612U Alfa loads as "mt76x2u", the RTL8188EUS
+# as "rtl8xxxu".
+ONBOARD = 'brcmfmac'        # Pi's built-in 2.4GHz radio
+# AUTO fill order PER ROLE (preferred first). Every role falls through the whole
+# list, so a rig with FEWER adapters still works (public repo / testing):
+#   ssh     -> RTL8188EUS (dedicated), then onboard, then ANY - SSH must connect
+#              somehow, even off a single adapter; SSH may legitimately BE the uplink.
+#   monitor -> Archer (RTL8821AU), then Alfa/others, then onboard (2.4G).
+#   badusb  -> onboard (the Pico AP is 2.4G), then any NON-SSH adapter (on Pico
+#              CONNECT it takes whatever is free, but NEVER the live-SSH iface).
+PREF = {
+    'ssh':     ['rtl8xxxu', 'brcmfmac', 'rtl8821au', 'mt76x2u', 'rtl8812au', 'r8188eu', '8188eu'],
+    'monitor': ['mt76x2u', 'rtl8821au', 'rtl8812au', 'rtl8xxxu', 'r8188eu', '8188eu', 'brcmfmac'],
+    'badusb':  ['brcmfmac', 'mt76x2u', 'rtl8812au', 'rtl8821au', 'rtl8xxxu', 'r8188eu', '8188eu'],
+}
+PRIORITY = ['rtl8xxxu', 'rtl8821au', 'mt76x2u', 'rtl8812au', 'r8188eu', '8188eu', 'brcmfmac']  # roles-screen cycle
+CHIP_LABEL = {'mt76x2u': 'MT7612U (Alfa, dual)', 'rtl8812au': 'RTL8812AU (dual)',
+              'rtl8821au': 'RTL8821AU / Archer', 'rtl8xxxu': 'RTL8188EUS (2.4G)', 'r8188eu': 'RTL8188EUS',
+              '8188eu': 'RTL8188EUS', 'brcmfmac': 'Onboard (2.4G)'}
 
 PWN_CONF = '/etc/pwnagotchi/config.toml'
 
@@ -115,28 +127,47 @@ def resolve(role, roles=None, present=None):
     never in that pool. Returns (None, None) if only the SSH adapter exists."""
     present = present if present is not None else present_adapters()
     roles = roles if roles is not None else load_roles()
-    if role == 'ssh':
-        a = roles.get('ssh')
-        if a and a in present:
-            return present[a], a
-        for chip in PRIORITY:
-            if chip in present:
-                return present[chip], chip
-        return None, None
-    live_ssh = active_uplink_iface()
+    live = active_uplink_iface()
     a = roles.get(role)
-    if a and a in present and present[a] != live_ssh:
-        return present[a], a
-    for chip in PRIORITY:
-        if chip in present and present[chip] != live_ssh:
+    order = ([a] if a else []) + PREF.get(role, PRIORITY)
+    if role == 'ssh':
+        # SSH must connect SOMEHOW - it may legitimately BE the live uplink, so
+        # the live iface is NOT excluded here. Preferred chipset first, then fall
+        # through the whole list; if nothing matched, keep whatever carries SSH now.
+        for chip in order:
+            if chip and chip in present:
+                return present[chip], chip
+        for chip, iface in present.items():
+            if iface == live:
+                return iface, chip
+        return None, None
+    # monitor / badusb - the live-SSH iface is SACRED and is skipped in every
+    # case (using it would kill SSH). Preferred chipset first, then fall through.
+    for chip in order:
+        if chip and chip in present and present[chip] != live:
             return present[chip], chip
     return None, None   # only the live SSH adapter is left - refuse (never kill SSH)
 
 
 def role_of(chipset, roles=None):
-    """Which role(s) a chipset is ASSIGNED to (for display). '' if none."""
+    """Which role(s) a chipset is explicitly PINNED to (for the conflict note).
+    '' if none."""
     roles = roles if roles is not None else load_roles()
     return '+'.join(ROLE_SHORT[r] for r in ROLES if roles.get(r) == chipset)
+
+
+def serving(iface, present=None, roles=None):
+    """Which role(s) this iface currently SERVES (pinned OR auto-resolved), for
+    display - so the Alfa reads 'MON*' when monitor is on AUTO. '*' = auto (not
+    pinned). '' if it serves nothing right now."""
+    present = present if present is not None else present_adapters()
+    roles = roles if roles is not None else load_roles()
+    out = []
+    for r in ROLES:
+        ri, _ = resolve(r, roles, present)
+        if ri == iface:
+            out.append(ROLE_SHORT[r] + ('' if roles.get(r) else '*'))
+    return '+'.join(out)
 
 
 # ---------------- apply: monitor (live, safe - never touches SSH) ----------------
@@ -196,5 +227,67 @@ def apply_ssh_priority(chipset):
                 subprocess.run(['nmcli', 'connection', 'modify', onm, 'connection.autoconnect-priority', '0'],
                                timeout=6, capture_output=True)
         return True, 'takes effect on next boot'
+    except Exception as e:
+        return False, str(e)[:40]
+
+
+# ---------------- SSH live START / STOP (operator control, on-device) ----------------
+def _home_wifi_conn():
+    """(name, iface) of the currently-active home-WiFi connection (the live SSH),
+    or (name, None) for the highest-priority saved WiFi profile if none active."""
+    try:
+        out = subprocess.run(['nmcli', '-t', '-f', 'NAME,DEVICE,TYPE', 'connection', 'show', '--active'],
+                             capture_output=True, text=True, timeout=6).stdout
+        for ln in out.splitlines():
+            p = ln.split(':')
+            if len(p) >= 3 and p[2] == '802-11-wireless':
+                return p[0], p[1]
+        out = subprocess.run(['nmcli', '-t', '-f', 'NAME,TYPE', 'connection', 'show'],
+                             capture_output=True, text=True, timeout=6).stdout
+        for ln in out.splitlines():
+            p = ln.split(':')
+            if len(p) >= 2 and p[1] == '802-11-wireless':
+                return p[0], None
+    except Exception:
+        pass
+    return None, None
+
+
+def apply_ssh_start():
+    """Bring SSH/internet UP on the highest-priority present adapter, so SSH
+    connects even if the preferred adapter is unplugged (falls through PREF).
+    If SSH is already up, no-op. Best-effort - always returns (ok, msg)."""
+    iface, chip = resolve('ssh')
+    if not iface:
+        return False, 'no WiFi adapter present'
+    if iface == active_uplink_iface():
+        return True, 'SSH already up on %s' % iface
+    try:
+        subprocess.run(['nmcli', 'dev', 'set', iface, 'managed', 'yes'], timeout=6, capture_output=True)
+        r = subprocess.run(['nmcli', 'dev', 'connect', iface], timeout=30, capture_output=True, text=True)
+        if r.returncode == 0:
+            return True, 'SSH up on %s (%s)' % (iface, CHIP_LABEL.get(chip, chip))
+        # fall back: bring the saved home-WiFi profile up (adapter may be bound to it)
+        name, _ = _home_wifi_conn()
+        if name:
+            r2 = subprocess.run(['nmcli', 'connection', 'up', name], timeout=30, capture_output=True, text=True)
+            if r2.returncode == 0:
+                return True, 'SSH up (%s)' % name
+        return False, 'connect failed: %s' % ((r.stderr or r.stdout).strip()[:38])
+    except Exception as e:
+        return False, str(e)[:40]
+
+
+def apply_ssh_stop():
+    """Disconnect the live SSH adapter (frees it for another use). Obviously
+    ends the SSH session - meant to be tapped ON THE DEVICE. (ok, msg)."""
+    iface = active_uplink_iface()
+    name, cur = _home_wifi_conn()
+    tgt = iface or cur
+    if not tgt:
+        return False, 'no active WiFi uplink to stop'
+    try:
+        subprocess.run(['nmcli', 'dev', 'disconnect', tgt], timeout=10, capture_output=True)
+        return True, 'SSH stopped on %s (freed)' % tgt
     except Exception as e:
         return False, str(e)[:40]

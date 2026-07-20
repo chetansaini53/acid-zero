@@ -25,12 +25,31 @@ import socket
 import subprocess
 from typing import Tuple
 
+try:
+    import acid_wifiroles
+except Exception:
+    acid_wifiroles = None
+
 # ---- Pico AP link (dedicated worker adapter, kept off the main SSH uplink) ----
 AP_SSID = 'AcidZero-Duck'          # must match firmware AP_SSID
 AP_PSK = 'acidzero1337'            # must match firmware AP_PASSWORD (WPA2, >= 8 chars)
-AP_IFACE = 'wlan2'                 # spare RTL8188EUS dongle - NOT the SSH uplink (wlan1)
+AP_IFACE_FALLBACK = 'wlan2'        # used only if the role resolver is unavailable
 AP_CONN = 'acidzero-duck'          # NetworkManager connection profile name
-PI_ADDR = '192.168.4.2/24'         # static IP for wlan2 on the Pico AP subnet
+PI_ADDR = '192.168.4.2/24'         # static IP for the worker adapter on the Pico AP subnet
+
+
+def _ap_iface() -> str:
+    """The worker adapter for the 'badusb' role - resolved LIVE by chipset (see
+    acid_wifiroles.py) so it follows whichever adapter is assigned/plugged in,
+    never the SSH uplink. Falls back to the original hardcoded wlan2."""
+    if acid_wifiroles is not None:
+        try:
+            iface, _chip = acid_wifiroles.resolve('badusb')
+            if iface:
+                return iface
+        except Exception:
+            pass
+    return AP_IFACE_FALLBACK
 
 HOST = '192.168.4.1'               # the Pico AP gateway = the Pico itself
 PORT = 1337
@@ -54,19 +73,21 @@ def _nmcli(*args: str, timeout: float = 25.0) -> Tuple[int, str]:
 
 def ap_visible() -> bool:
     """True if the Pico's AP is currently broadcasting (seen on the worker iface)."""
-    _nmcli('dev', 'set', AP_IFACE, 'managed', 'yes')
-    _nmcli('dev', 'wifi', 'rescan', 'ifname', AP_IFACE)
-    _rc, out = _nmcli('-t', '-f', 'SSID', 'dev', 'wifi', 'list', 'ifname', AP_IFACE)
+    iface = _ap_iface()
+    _nmcli('dev', 'set', iface, 'managed', 'yes')
+    _nmcli('dev', 'wifi', 'rescan', 'ifname', iface)
+    _rc, out = _nmcli('-t', '-f', 'SSID', 'dev', 'wifi', 'list', 'ifname', iface)
     return AP_SSID in [ln.strip() for ln in out.split('\n')]
 
 
 def link_connect() -> Tuple[bool, str]:
     """Join the Pico AP on the dedicated worker adapter (static IP, no default route)."""
-    _nmcli('dev', 'set', AP_IFACE, 'managed', 'yes')
+    iface = _ap_iface()
+    _nmcli('dev', 'set', iface, 'managed', 'yes')
     if not ap_visible():
         return False, "'%s' not found - power the Pico, wait ~20s" % AP_SSID
     _nmcli('con', 'delete', AP_CONN)   # idempotent recreate
-    rc, _out = _nmcli('con', 'add', 'type', 'wifi', 'con-name', AP_CONN, 'ifname', AP_IFACE,
+    rc, _out = _nmcli('con', 'add', 'type', 'wifi', 'con-name', AP_CONN, 'ifname', iface,
                       'ssid', AP_SSID, 'wifi-sec.key-mgmt', 'wpa-psk', 'wifi-sec.psk', AP_PSK,
                       'ipv4.method', 'manual', 'ipv4.addresses', PI_ADDR, 'ipv4.never-default', 'yes',
                       'ipv6.method', 'ignore', 'connection.autoconnect', 'no')
@@ -79,15 +100,15 @@ def link_connect() -> Tuple[bool, str]:
 
 
 def link_disconnect() -> Tuple[bool, str]:
-    """Release the worker adapter (SSH always stays on the main uplink wlan1)."""
+    """Release the worker adapter (SSH always stays on the main uplink)."""
     _nmcli('con', 'down', AP_CONN)
-    _nmcli('dev', 'set', AP_IFACE, 'managed', 'yes')   # ready for next connect / NM auto
+    _nmcli('dev', 'set', _ap_iface(), 'managed', 'yes')   # ready for next connect / NM auto
     return True, 'disconnected'
 
 
 def link_active() -> bool:
     """True if the worker adapter is currently connected to the Pico AP."""
-    _rc, out = _nmcli('-t', '-f', 'GENERAL.CONNECTION', 'dev', 'show', AP_IFACE)
+    _rc, out = _nmcli('-t', '-f', 'GENERAL.CONNECTION', 'dev', 'show', _ap_iface())
     return AP_CONN in out
 
 
