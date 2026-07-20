@@ -1,6 +1,8 @@
 import glob,os,io,time,socket,subprocess,urllib.request,json,base64,re,struct,select,threading,math
 from PIL import Image,ImageOps,ImageDraw,ImageFont
 import numpy as np
+try: import acid_wifiroles
+except Exception: acid_wifiroles=None
 THEMES={
  'dark':{'BG':(7,13,9),'PANEL':(14,22,15),'TILE':(12,19,13),'FG':(216,255,232),'ACC':(25,255,121),'DIM':(93,128,104),'LINE':(23,48,35),'BARBG':(10,17,11)},
  'light':{'BG':(236,242,238),'PANEL':(255,255,255),'TILE':(250,252,250),'FG':(20,40,28),'ACC':(8,158,74),'DIM':(116,140,124),'LINE':(212,226,218),'BARBG':(244,248,244)},
@@ -844,6 +846,7 @@ def ssh_uplink_iface():
 def wifi_status_scan():
     global radio_rows,ssh_iface,mon_iface
     up=ssh_uplink_iface(); ssh_iface=up; mon='?'; rows=[]
+    aroles=(acid_wifiroles.load_roles() if acid_wifiroles else {})
     for w in _rsh("ls /sys/class/net | grep -E '^wlan'").split():
         drv=_rsh("basename $(readlink /sys/class/net/%s/device/driver 2>/dev/null)"%w)
         chip=DRV2CHIP.get(drv,drv or '?')
@@ -852,30 +855,99 @@ def wifi_status_scan():
         ipa=_rsh("ip -4 addr show %s 2>/dev/null | awk '/inet /{print $2}'"%w)
         ssid=_rsh("iw dev %s link 2>/dev/null | sed -n 's/.*SSID: //p'"%w)
         cl=_rsh("iw dev %s station dump 2>/dev/null | grep -c Station"%w)
-        if w==up: role='SSH UPLINK'; pri=0
-        elif 'mon' in w or typ=='monitor': role='monitor (recon)'; mon=w; pri=1
-        elif typ=='AP' or (cl.isdigit() and int(cl)>0): role='AP %s cl'%cl; pri=2
-        elif ssid: role='client: '+ssid; pri=3
-        elif st in ('up','dormant'): role='up / idle'; pri=4
-        else: role='down'; pri=5
-        rows.append({'if':w,'chip':chip,'role':role,'ip':ipa,'pri':pri})
+        if w==up: role='SSH uplink'; live='ssh'; pri=0
+        elif 'mon' in w or typ=='monitor': role='monitor'; live='mon'; mon=w; pri=1
+        elif typ=='AP' or (cl.isdigit() and int(cl)>0): role='AP (%s cl)'%cl; live='ap'; pri=2
+        elif ssid: role='client: '+ssid; live='cli'; pri=3
+        elif st in ('up','dormant'): role='up / free'; live='idle'; pri=4
+        else: role='DOWN / free'; live='down'; pri=5
+        assigned=(acid_wifiroles.role_of(drv,aroles) if (acid_wifiroles and drv) else '')
+        note=''
+        if assigned:
+            if ('MON' in assigned or 'DUCK' in assigned) and w==up: note='busy: SSH'
+            elif 'SSH' in assigned and w!=up: note='boot-pending'
+        rows.append({'if':w,'chip':chip,'role':role,'ip':ipa,'pri':pri,'live':live,'assigned':assigned,'note':note})
     rows.sort(key=lambda r:r['pri'])
     radio_rows=rows; mon_iface=mon
+LIVECOL={'ssh':(235,80,80),'mon':(30,200,121),'ap':(235,130,55),'cli':(70,130,235),'idle':(190,180,90),'down':(120,120,120)}
 def draw_wifistatus(d):
-    topbar(d,'WiFi / RADIO STATUS')
+    topbar(d,'RADIO STATUS')
     rr(d,(98,4,148,24),outline=ACC,w=1,r=5); ct(d,123,15,'scan',F_SM,ACC)
     if not radio_rows:
         ct(d,W//2,150,'scanning radios...',F_NM,DIM); return
-    lt(d,12,36,'%d radios   SSH=%s (never touch)   bind by CHIPSET not wlanN'%(len(radio_rows),ssh_iface),F_TINY,DIM)
-    y=54
+    lt(d,12,36,'%d radios   live SSH = %s   (assign in Settings > WiFi Roles)'%(len(radio_rows),ssh_iface),F_TINY,DIM)
+    y=50
     for r in radio_rows:
-        rc=(235,80,80) if r['pri']==0 else (30,200,121) if r['pri']==1 else (235,130,55) if r['pri']==2 else (70,130,235) if r['pri']==3 else DIM
-        d.ellipse((14,y+6,24,y+16),fill=rc)
-        lt(d,32,y,'%-9s %s'%(r['if'],r['chip']),F_NM,FG)
-        lt(d,32,y+16,r['role']+(('  '+r['ip']) if r['ip'] else ''),F_TINY,DIM)
-        ct(d,W-44,y+10,ROLETAG.get(r['pri'],'?'),F_SM,rc)
-        y+=36
-    lt(d,12,H-26,'roles auto-detected live  -  reshuffles on reboot, so trust CHIPSET',F_TINY,DIM)
+        rc=LIVECOL.get(r['live'],DIM)
+        rr(d,(8,y,472,y+42),fill=TILE,outline=LINE,w=1,r=8)
+        d.ellipse((16,y+8,26,y+18),fill=rc)
+        lt(d,34,y+13,'%-9s %s'%(r['if'],r['chip']),F_NM,FG)
+        if r['assigned']:
+            rr(d,(382,y+5,466,y+21),fill=PANEL,outline=(210,140,40),w=1,r=6); ct(d,424,y+13,'assigned '+r['assigned'],F_TINY,(210,140,40))
+        else:
+            ct(d,424,y+13,'unassigned',F_TINY,DIM)
+        lt(d,34,y+30,'live: '+r['role']+(('   '+r['ip']) if r['ip'] else ''),F_TINY,rc)
+        if r['note']:
+            ct(d,430,y+30,r['note'],F_TINY,(235,80,80) if r['note']=='busy: SSH' else (210,140,40))
+        y+=46
+    lt(d,12,H-14,'green=recon  red=SSH(never touch)  blue=client  grey=free/down',F_TINY,DIM)
+# ---- WiFi Roles: assign which adapter each service uses (tap chip = cycle) ----
+ROLE_ROWS=[('ssh','SSH + Internet  (every boot)'),('monitor','Pwnagotchi / Radar / Wardrive'),('badusb','Bad USB (Pico link)')]
+roles_edit={}; roles_confirm=None; roles_confirm_t=0.0; roles_status=''; roles_status_t=0.0
+def roles_enter():
+    global roles_edit,roles_confirm
+    roles_edit=(acid_wifiroles.load_roles() if acid_wifiroles else {r:None for r,_ in ROLE_ROWS})
+    roles_confirm=None
+def roles_cycle(role):
+    global roles_edit
+    if not acid_wifiroles: return
+    present=list(acid_wifiroles.present_adapters().keys())
+    order=[None]+[c for c in acid_wifiroles.PRIORITY if c in present]
+    cur=roles_edit.get(role)
+    nxt=order[(order.index(cur)+1)%len(order)] if cur in order else (order[0] if order else None)
+    roles_edit[role]=nxt; acid_wifiroles.save_roles(roles_edit)
+def draw_wifiroles(d):
+    global roles_status
+    topbar(d,'WiFi ROLES')
+    if not acid_wifiroles:
+        ct(d,W//2,150,'acid_wifiroles module missing',F_NM,DIM); return
+    present=acid_wifiroles.present_adapters()
+    lt(d,12,40,'tap a chip to cycle  -  AUTO = highest-priority adapter present',F_TINY,DIM)
+    y0=48
+    for i,(role,label) in enumerate(ROLE_ROWS):
+        y=y0+i*70
+        rr(d,(10,y,470,y+62),fill=TILE,outline=LINE,w=1,r=10)
+        lt(d,20,y+15,label,F_SM,FG)
+        chip=roles_edit.get(role); chip_txt=acid_wifiroles.CHIP_LABEL.get(chip,'AUTO') if chip else 'AUTO'
+        rr(d,(20,y+26,270,y+52),fill=PANEL,outline=ACC,w=1,r=8); ct(d,145,y+39,chip_txt,F_SM,ACC)
+        iface,rchip=acid_wifiroles.resolve(role,roles=roles_edit,present=present)
+        live_ok=iface is not None
+        d.ellipse((280,y+34,290,y+44),fill=(30,200,121) if live_ok else (200,70,70))
+        lt(d,296,y+39,('live: %s'%iface) if live_ok else 'no adapter free',F_TINY,DIM if live_ok else (200,90,90))
+        if role in ('ssh','monitor'):
+            armed=(roles_confirm==role and time.time()-roles_confirm_t<4)
+            rr(d,(376,y+26,466,y+52),fill=(210,140,40) if armed else TILE,outline=ACC,w=1,r=8)
+            ct(d,421,y+39,'tap again' if armed else 'SET',F_TINY if armed else F_SM,BG if armed else ACC)
+    ct(d,240,H-16,roles_status[:58] if (roles_status and time.time()-roles_status_t<6) else \
+       'SSH: takes effect next boot (never live-migrates)  -  Monitor: restarts pwnagotchi',F_TINY,DIM)
+def touch_wifiroles(tx,ty):
+    global roles_confirm,roles_confirm_t,roles_status,roles_status_t
+    y0=48
+    for i,(role,_label) in enumerate(ROLE_ROWS):
+        y=y0+i*70
+        if 20<=tx<=270 and y+26<=ty<=y+52:
+            roles_cycle(role); roles_confirm=None; return
+        if role in ('ssh','monitor') and 376<=tx<=466 and y+26<=ty<=y+52:
+            now=time.time()
+            if roles_confirm==role and now-roles_confirm_t<4:
+                roles_confirm=None
+                chip=roles_edit.get(role) or (acid_wifiroles.resolve(role,roles=roles_edit)[1] if acid_wifiroles else None)
+                if not chip: roles_status='pick a chip first'; roles_status_t=now; return
+                ok,msg=(acid_wifiroles.apply_ssh_priority(chip) if role=='ssh' else acid_wifiroles.apply_monitor(chip))
+                roles_status=('OK: ' if ok else 'ERR: ')+msg; roles_status_t=now
+            else:
+                roles_confirm=role; roles_confirm_t=now
+            return
 def draw_settings(d):
     topbar(d,'SETTINGS')
     lt(d,22,44,'THEME  -  tap anywhere in this box',F_SM,DIM)
@@ -890,8 +962,9 @@ def draw_settings(d):
     d.line([(10,168),(W-10,168)],fill=LINE)
     rr(d,(14,180,234,224),fill=TILE,outline=ACC,w=2,r=12); ct(d,124,202,'calibrate touch',F_NM,ACC)
     rr(d,(246,180,466,224),fill=TILE,outline=(70,130,235),w=2,r=12); ct(d,356,202,'System & Power',F_NM,(70,130,235))
-    rr(d,(14,232,466,274),fill=TILE,outline=(30,200,121),w=2,r=12); ct(d,240,253,'WiFi / Radio Status',F_NM,(30,200,121))
-    ct(d,240,288,'which adapter is SSH / monitor / AP  -  avoid breaking SSH',F_TINY,DIM)
+    rr(d,(14,232,234,274),fill=TILE,outline=(30,200,121),w=2,r=12); ct(d,124,253,'Radio Status',F_NM,(30,200,121))
+    rr(d,(246,232,466,274),fill=TILE,outline=(210,140,40),w=2,r=12); ct(d,356,253,'WiFi Roles',F_NM,(210,140,40))
+    ct(d,240,288,'which adapter is SSH / monitor / AP  -  and who uses which',F_TINY,DIM)
 SVC=[('Pwnagotchi','pwnagotchi'),('Bluetooth','bluetooth'),('HS-Clean','acid-hs-clean.timer'),('HDMI Mirror','acid-hdmi-mirror'),('Screen Stream','acid-fb-stream')]
 SVC_YY=[36,66,96,126,156]   # row tops; draw_system() and the System touch handler share this
 svc_state={}
@@ -1317,6 +1390,7 @@ while True:
                     elif screen=='System': screen='Settings'
                     elif screen=='HWInfo': screen='About'
                     elif screen=='WiFiStatus': screen='Settings'
+                    elif screen=='WiFiRoles': screen='Settings'
                     elif screen=='BLE Inspect': screen='BLE Scan'
                     elif screen.startswith('Radar:'): radar_deauth_stop(); radar_blespam_stop(); radar_flipper_stop(); radar_all_stop(); screen='Radar'; radar_img=None
                     elif screen=='learn': screen=learn_topic
@@ -1335,9 +1409,14 @@ while True:
                         if tx<240: screen='calibrate'; cal_raws=[]
                         else: screen='System'; svc_refresh()
                 elif screen=='Settings' and 232<=ty<=274:
-                    if now-_last_act>0.4: _last_act=now; screen='WiFiStatus'; radio_rows=[]; wifi_status_scan()
+                    if now-_last_act>0.4:
+                        _last_act=now
+                        if tx<240: screen='WiFiStatus'; radio_rows=[]; wifi_status_scan()
+                        else: screen='WiFiRoles'; roles_enter()
                 elif screen=='WiFiStatus' and ty<=26 and 96<=tx<=150:
                     if now-_last_act>0.4: _last_act=now; wifi_status_scan()
+                elif screen=='WiFiRoles':
+                    touch_wifiroles(tx,ty)
                 elif screen=='System':
                     if now-_last_act>0.4:
                         hit=False
@@ -1497,6 +1576,7 @@ while True:
         if screen=='Radar:eviltwin' and now-last_draw>=1.0: dirty=True
         if screen=='Radar:all' and now-last_draw>=0.5: dirty=True
         if screen=='calibrate' or (cal_msg and now-cal_msg_t<6) or (wifi_status and now-wifi_status_t<5): dirty=True
+        if screen=='WiFiRoles' and roles_confirm and now-roles_confirm_t<4.2: dirty=True
         if dirty or now-last_draw>=REFRESH:
             dirty=False; last_draw=now
             mi=int(now/3.0)%len(MOODS)
@@ -1515,6 +1595,7 @@ while True:
             elif screen=='HWInfo': draw_hwinfo(d)
             elif screen=='Settings': draw_settings(d)
             elif screen=='WiFiStatus': draw_wifistatus(d)
+            elif screen=='WiFiRoles': draw_wifiroles(d)
             elif screen=='System': draw_system(d)
             elif screen=='calibrate': draw_calibrate(d,len(cal_raws))
             elif screen=='WiFi': draw_wifi(d)
