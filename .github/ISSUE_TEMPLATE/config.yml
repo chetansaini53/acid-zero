@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "\U0001F512 Security / vulnerability report (private)"
+    url: mailto:chetansaini53@gmail.com
+    about: "Do NOT open a public issue for a security vulnerability. Report it privately by email - responsible disclosure."
+  - name: "\U0001F4DC Ethics & authorized-use policy"
+    url: https://github.com/chetansaini53/acid-zero/blob/master/ETHICS.md
+    about: "Read before using or requesting features - Acid Zero is for authorized / educational / defensive use only."
+  - name: "\U0001F4D6 Setup & flashing guide"
+    url: https://github.com/chetansaini53/acid-zero/blob/master/INSTALL.md
+    about: "Build, deploy, and co-processor flashing steps."
