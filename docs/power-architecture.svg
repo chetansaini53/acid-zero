@@ -1,0 +1,113 @@
+<svg viewBox="0 0 1080 700" xmlns="http://www.w3.org/2000/svg" role="img" font-family="Segoe UI, Roboto, Arial, sans-serif">
+<title>Acid Zero - Power / Battery Architecture</title>
+<desc>A pogo-pin 18650 UPS HAT (Waveshare UPS HAT B) powers the Raspberry Pi 3B+ from below via pogo pins, using no GPIO header pins, so the ILI9486 SPI display stays on the header. It boosts the 18650 pack to 5V at up to 5A - enough for the Pi plus the powered USB hub feeding the WiFi adapters, ESP32, Pico and GPS. Charge-while-use makes it a true UPS. A single momentary button on GPIO3/pin5 to GND gives start (wake) and safe shutdown via the gpio-shutdown overlay; an I2C fuel gauge lets a script auto-shut-down before the battery dies. A power bank into the Pi micro-USB is the simple no-HAT alternative.</desc>
+
+<defs>
+  <marker id="ag" markerWidth="11" markerHeight="11" refX="8" refY="3.5" orient="auto"><path d="M0,0 L9,3.5 L0,7 Z" fill="#7ee07e"/></marker>
+  <marker id="ab" markerWidth="11" markerHeight="11" refX="8" refY="3.5" orient="auto"><path d="M0,0 L9,3.5 L0,7 Z" fill="#4aa3ff"/></marker>
+  <marker id="ao" markerWidth="11" markerHeight="11" refX="8" refY="3.5" orient="auto"><path d="M0,0 L9,3.5 L0,7 Z" fill="#ff8a3d"/></marker>
+  <marker id="ap" markerWidth="11" markerHeight="11" refX="8" refY="3.5" orient="auto"><path d="M0,0 L9,3.5 L0,7 Z" fill="#c9b8e6"/></marker>
+</defs>
+
+<rect x="0" y="0" width="1080" height="700" rx="14" fill="#0e1525"/>
+<text x="540" y="38" text-anchor="middle" fill="#e8eef7" font-size="24" font-weight="700">Acid Zero - Power / Battery Architecture</text>
+<text x="540" y="61" text-anchor="middle" fill="#8a97ab" font-size="13.5">18650 UPS via POGO PINS (0 GPIO used - display stays on) · 5V @ 5A for the whole rig · one-button safe shutdown</text>
+
+<!-- charge source -->
+<rect x="34" y="92" width="216" height="58" rx="8" fill="#2a2e36" stroke="#454b57"/>
+<text x="142" y="116" text-anchor="middle" fill="#aab3c2" font-size="13" font-weight="700">Wall / power bank 5V</text>
+<text x="142" y="136" text-anchor="middle" fill="#7c8696" font-size="11">plugs into the UPS charge port</text>
+
+<!-- 18650 pack -->
+<rect x="34" y="170" width="216" height="86" rx="8" fill="#16241c" stroke="#3f7d5a" stroke-width="1.5"/>
+<text x="142" y="196" text-anchor="middle" fill="#7ee07e" font-size="14" font-weight="700">2x 18650 pack</text>
+<text x="142" y="218" text-anchor="middle" fill="#9fd0c0" font-size="11">Li-ion · the internal battery</text>
+<text x="142" y="238" text-anchor="middle" fill="#9fd0c0" font-size="11">hot-swappable, ~6800mAh</text>
+
+<!-- UPS HAT (B) -->
+<rect x="288" y="88" width="356" height="376" rx="12" fill="#15171c" stroke="#3ba7a0" stroke-width="2"/>
+<text x="466" y="112" text-anchor="middle" fill="#7fe0d6" font-size="16" font-weight="700">Waveshare UPS HAT (B)</text>
+<text x="466" y="132" text-anchor="middle" fill="#8a97ab" font-size="11">mounts UNDER the Pi · POGO PINS · 0 GPIO used</text>
+
+<rect x="306" y="146" width="320" height="52" rx="8" fill="#1b2230" stroke="#2a3550"/>
+<text x="466" y="167" text-anchor="middle" fill="#cfe0ff" font-size="12.5" font-weight="700">Charge controller</text>
+<text x="466" y="185" text-anchor="middle" fill="#8a97ab" font-size="11">charge WHILE running = true UPS</text>
+
+<rect x="306" y="206" width="320" height="58" rx="8" fill="#16241c" stroke="#3f7d5a" stroke-width="1.5"/>
+<text x="466" y="228" text-anchor="middle" fill="#7ee07e" font-size="13" font-weight="700">Boost -> 5V @ up to 5A</text>
+<text x="466" y="248" text-anchor="middle" fill="#9fd0c0" font-size="11">enough for Pi + hub + ALL radios</text>
+
+<rect x="306" y="272" width="320" height="46" rx="8" fill="#1b2230" stroke="#2a3550"/>
+<text x="466" y="299" text-anchor="middle" fill="#cfe0ff" font-size="12.5" font-weight="700">I2C fuel gauge (battery %)</text>
+
+<rect x="306" y="326" width="320" height="52" rx="8" fill="#2a2e36" stroke="#454b57"/>
+<text x="466" y="347" text-anchor="middle" fill="#ffce9a" font-size="12.5" font-weight="700">POGO PINS -> Pi 5V / GND</text>
+<text x="466" y="365" text-anchor="middle" fill="#7c8696" font-size="10.5">press the header UNDERSIDE</text>
+
+<text x="466" y="400" text-anchor="middle" fill="#9fd0c0" font-size="11" font-style="italic">no 40-pin stacking -> display stays on top</text>
+<text x="466" y="422" text-anchor="middle" fill="#7c8696" font-size="10.5">Pi 3B+ / 3B / 4B supported · 8.4V charger incl.</text>
+
+<!-- Raspberry Pi -->
+<rect x="690" y="88" width="350" height="376" rx="12" fill="#15171c" stroke="#a23b3b" stroke-width="2"/>
+<text x="865" y="112" text-anchor="middle" fill="#ff7a7a" font-size="16" font-weight="700">Raspberry Pi 3B+ (the brain)</text>
+
+<rect x="708" y="130" width="314" height="48" rx="8" fill="#16241c" stroke="#3f7d5a" stroke-width="1.5"/>
+<text x="865" y="151" text-anchor="middle" fill="#7ee07e" font-size="12.5" font-weight="700">5V rail (pins 2 / 4) &lt;- pogo 5V</text>
+<text x="865" y="169" text-anchor="middle" fill="#9fd0c0" font-size="10.5">or micro-USB (power bank path)</text>
+
+<rect x="708" y="186" width="314" height="54" rx="8" fill="#1b2230" stroke="#2a3550"/>
+<text x="865" y="207" text-anchor="middle" fill="#cfe0ff" font-size="12.5" font-weight="700">ILI9486 3.5" display on GPIO (top)</text>
+<text x="865" y="225" text-anchor="middle" fill="#8a97ab" font-size="11">SPI0 + touch - UNTOUCHED by the UPS</text>
+
+<rect x="708" y="248" width="314" height="54" rx="8" fill="#221f2b" stroke="#6a5a8a" stroke-width="1.5"/>
+<text x="865" y="269" text-anchor="middle" fill="#c9b8e6" font-size="12.5" font-weight="700">GPIO3 (pin5) + GND (pin6) &lt;- button</text>
+<text x="865" y="287" text-anchor="middle" fill="#9a8cb8" font-size="10.5">one free pin pair, tapped past the shield</text>
+
+<rect x="708" y="310" width="314" height="54" rx="8" fill="#1b2230" stroke="#2a3550"/>
+<text x="865" y="331" text-anchor="middle" fill="#cfe0ff" font-size="12.5" font-weight="700">reads I2C gauge (SDA/SCL)</text>
+<text x="865" y="349" text-anchor="middle" fill="#8a97ab" font-size="11">-> auto safe-shutdown before batt dies</text>
+
+<text x="865" y="392" text-anchor="middle" fill="#9fd0c0" font-size="11" font-style="italic">SD-safe: no more yank-the-power corruption</text>
+<text x="865" y="414" text-anchor="middle" fill="#7c8696" font-size="10.5">ESP32 / Pico / GPS all ride the USB hub</text>
+
+<!-- power button -->
+<rect x="690" y="486" width="350" height="58" rx="10" fill="#221f2b" stroke="#6a5a8a" stroke-width="2"/>
+<text x="865" y="509" text-anchor="middle" fill="#c9b8e6" font-size="13" font-weight="700">ONE momentary button = START + SHUTDOWN</text>
+<text x="865" y="529" text-anchor="middle" fill="#9a8cb8" font-size="11">dtoverlay=gpio-shutdown  (pin5 &lt;-&gt; pin6)</text>
+
+<!-- powered hub -->
+<rect x="288" y="486" width="356" height="90" rx="10" fill="#2a2e36" stroke="#454b57"/>
+<text x="466" y="510" text-anchor="middle" fill="#aab3c2" font-size="13.5" font-weight="700">Powered USB hub</text>
+<text x="466" y="531" text-anchor="middle" fill="#ff8a3d" font-size="11">5V TAP from the UPS rail (NOT the Pi's USB)</text>
+<text x="466" y="552" text-anchor="middle" fill="#7c8696" font-size="11">4x USB WiFi · ESP32 · Pico 2W · GPS</text>
+<text x="466" y="569" text-anchor="middle" fill="#7c8696" font-size="10">the radios are the big draw - hence 5A</text>
+
+<!-- alt quick path -->
+<rect x="34" y="486" width="216" height="90" rx="8" fill="#12203a" stroke="#2a3550"/>
+<text x="142" y="508" text-anchor="middle" fill="#7ee07e" font-size="12.5" font-weight="700">QUICK PATH (no HAT)</text>
+<text x="142" y="530" text-anchor="middle" fill="#cfe0ff" font-size="11">power bank -&gt; Pi micro-USB</text>
+<text x="142" y="549" text-anchor="middle" fill="#8a97ab" font-size="10.5">your test - already works</text>
+<text x="142" y="566" text-anchor="middle" fill="#8a97ab" font-size="10.5">same 5V, no safe-shutdown</text>
+
+<!-- ===== arrows ===== -->
+<!-- charge -> UPS -->
+<path d="M250,121 L288,130" fill="none" stroke="#4aa3ff" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ab)"/>
+<!-- battery -> UPS -->
+<path d="M250,213 L288,232" fill="none" stroke="#7ee07e" stroke-width="2.5" marker-end="url(#ag)"/>
+<!-- UPS -> Pi (5V main) -->
+<path d="M644,300 L690,154" fill="none" stroke="#7ee07e" stroke-width="3" marker-end="url(#ag)"/>
+<rect x="600" y="212" width="120" height="30" rx="6" fill="#0e1525" stroke="#3f7d5a"/>
+<text x="660" y="231" text-anchor="middle" fill="#7ee07e" font-size="10.5">5V @ 5A (pogo)</text>
+<!-- UPS -> hub (5V tap) -->
+<path d="M466,464 L466,486" fill="none" stroke="#ff8a3d" stroke-width="3" marker-end="url(#ao)"/>
+<!-- button -> Pi -->
+<path d="M865,486 L865,364" fill="none" stroke="#c9b8e6" stroke-width="2.5" marker-end="url(#ap)"/>
+<!-- I2C gauge dotted -->
+<path d="M626,295 L708,330" fill="none" stroke="#7fb6ff" stroke-width="1.5" stroke-dasharray="3 3"/>
+
+<!-- footer strip -->
+<rect x="34" y="600" width="1006" height="70" rx="8" fill="#12203a" stroke="#2a3550"/>
+<text x="50" y="623" fill="#7ee07e" font-size="12" font-weight="700">Why this fits Acid Zero:</text>
+<text x="50" y="643" fill="#cfe0ff" font-size="11.5">1. POGO PINS = no 40-pin stacking, so the ILI9486 display keeps the GPIO header.   2. 5V @ 5A carries the Pi + powered hub + 4 radios (the</text>
+<text x="50" y="661" fill="#cfe0ff" font-size="11.5">real current hog).   3. charge-while-use = true UPS.   4. one gpio-shutdown button (pin5/pin6) does start + safe shutdown - no SD corruption.</text>
+</svg>
