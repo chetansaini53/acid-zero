@@ -272,14 +272,14 @@ def ble_scan_start():
         subprocess.Popen(['setsid','python3','/usr/local/bin/acid-ble-scan.py','8'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,stdin=subprocess.DEVNULL)
         ble_status='scanning ~8s...'; ble_status_t=time.time()
     except Exception: ble_status='scan err'; ble_status_t=time.time()
-def ble_devices(n=7):
+def ble_devices(n=7,off=0):
     out=[]
     try:
         for l in open('/tmp/acid_ble_devices'):
             p=l.rstrip('\n').split('|')
             if len(p)>=4: out.append((p[0],p[1],p[2],p[3]))
     except Exception: pass
-    return out[:n]
+    return out[off:off+n]
 def ble_dev_count():
     try: return sum(1 for l in open('/tmp/acid_ble_devices') if l.strip())
     except Exception: return 0
@@ -381,7 +381,7 @@ def face_thread():
             data=urllib.request.urlopen(URL,timeout=4).read()
             g=Image.open(io.BytesIO(data)).convert('L')
             pwn_src=g; pwn_src_t=time.time()
-            face_img=ImageOps.colorize(g.crop((16,34,218,80)),black=PANEL,white=ACC).convert('RGB'); dirty=True
+            face_img=ImageOps.colorize(g.crop((18,30,144,84)),black=PANEL,white=ACC).convert('RGB'); dirty=True  # full face expression centered (drops name/status; no left clip)
         except Exception: pass
         time.sleep(2.0)
 def net_bg_thread():
@@ -484,15 +484,28 @@ def draw_consent(d):
     y=42
     for ln in lines: lt(d,18,y,ln[:54],F_SM,FG); y+=16
     rr(d,(90,258,390,296),fill=ACC,r=10); ct(d,240,277,'I UNDERSTAND & ACCEPT',F_NM,BG)
+LEARN_VIS=13   # info lines visible before UP/DOWN paging kicks in
 def draw_learn(d):
+    global learn_off
     topbar(d,learn_topic[:18])
     info=LEARN.get(learn_topic,{})
+    lines=[(14,'HOW IT WORKS',ACC)]
+    for ln in info.get('how',[]): lines.append((20,ln[:54],FG))
+    lines.append((0,'',FG))
+    lines.append((14,'DETECT / DEFEND',(70,130,235)))
+    for ln in info.get('defend',[]): lines.append((20,ln[:54],DIM))
+    total=len(lines); maxoff=max(0,total-LEARN_VIS); learn_off=min(max(learn_off,0),maxoff)
     y=40
-    lt(d,14,y,'HOW IT WORKS',F_SM,ACC); y+=20
-    for ln in info.get('how',[]): lt(d,20,y,ln[:54],F_SM,FG); y+=17
-    y+=8; lt(d,14,y,'DETECT / DEFEND',F_SM,(70,130,235)); y+=20
-    for ln in info.get('defend',[]): lt(d,20,y,ln[:54],F_SM,DIM); y+=17
-    lt(d,14,H-30,'educational / authorized use only',F_TINY,DIM)
+    for indent,txt,col in lines[learn_off:learn_off+LEARN_VIS]:
+        if txt: lt(d,indent,y,txt,F_SM,col)
+        y+=18
+    if total>LEARN_VIS:
+        by=H-24
+        rr(d,(10,by,120,by+21),outline=LINE,w=1,r=6); ct(d,65,by+10,'UP',F_SM,FG if learn_off>0 else DIM)
+        ct(d,240,by+10,'%d-%d / %d'%(learn_off+1,min(learn_off+LEARN_VIS,total),total),F_TINY,DIM)
+        rr(d,(360,by,470,by+21),outline=LINE,w=1,r=6); ct(d,415,by+10,'DOWN',F_SM,FG if learn_off<maxoff else DIM)
+    else:
+        lt(d,14,H-28,'educational / authorized use only',F_TINY,DIM)
 def learn_btn(d):
     # the (i) info button next to '< back' on any screen that has a LEARN entry
     if screen in LEARN:
@@ -521,7 +534,8 @@ def draw_home(d,mi):
     d.rectangle((0,27,W,93),fill=PANEL); d.line([(0,94),(W,94)],fill=LINE)
     rr(d,(6,31,128,90),fill=TILE,outline=LINE,w=1,r=8)
     if face_img is not None:
-        fw=112; fh=int(face_img.size[1]*fw/face_img.size[0]); d._image.paste(face_img.resize((fw,fh),Image.NEAREST),(11,31+(59-fh)//2))
+        iw,ih=face_img.size; s=min(122/iw,59/ih)*0.8; fw=max(1,int(iw*s)); fh=max(1,int(ih*s))   # fit box, then 20% smaller
+        d._image.paste(face_img.resize((fw,fh),Image.NEAREST),(6+(122-fw)//2,31+(59-fh)//2))   # horiz + vert center
     lt(d,140,46,'acid',F_NM,FG); rr(d,(178,39,224,54),outline=ACC,w=1,r=4); ct(d,201,46,'AUTO',F_SM,ACC)
     lt(d,140,70,MOODS[mi],F_SM,DIM)
     ct(d,300,46,str(pwnd()),F_BIG,ACC); ct(d,300,68,'pwnd',F_SM,DIM)
@@ -532,15 +546,16 @@ def draw_home(d,mi):
     d._image.paste(grid_cache,(0,GY))
 def draw_about(d):
     topbar(d,'ABOUT')
-    ct(d,W//2,52,'ACID ZERO',F_XL,ACC); ct(d,W//2,78,'v0.1  //  pentest handheld',F_SM,DIM)
-    rr(d,(150,96,330,138),fill=TILE,outline=LINE,w=1,r=8); ct(d,240,110,'author',F_SM,DIM); ct(d,240,128,'Chetan Saini',F_NM,ACC)
+    ct(d,W//2,46,'ACID ZERO',F_BIG,ACC); ct(d,W//2,64,'v0.1  ·  pentest handheld',F_TINY,DIM)
     if face_img is not None:
-        fw=110; fh=int(face_img.size[1]*fw/face_img.size[0]); d._image.paste(face_img.resize((fw,fh),Image.NEAREST),(28,98))
+        fw=76; fh=int(face_img.size[1]*fw/face_img.size[0]); d._image.paste(face_img.resize((fw,fh),Image.NEAREST),(24,80))
+    rr(d,(116,80,340,116),fill=TILE,outline=LINE,w=1,r=8); ct(d,228,94,'author',F_TINY,DIM); ct(d,228,106,'Chetan Saini',F_SM,ACC)
     rows=[('board',board()),('ip',ipaddr()),('uptime',upt()),('pwned',str(pwnd())+' handshakes')]
-    y=162
+    y=138
     for k,v in rows:
-        lt(d,40,y,k,F_SM,DIM); lt(d,150,y,v,F_NM,FG); y+=24
-    rr(d,(130,252,470,286),fill=TILE,outline=ACC,w=2,r=10); ct(d,300,269,'HARDWARE INFO  >',F_NM,ACC)
+        lt(d,40,y,k,F_SM,DIM); lt(d,150,y,str(v)[:36],F_SM,FG); y+=19
+    rr(d,(10,244,232,286),fill=TILE,outline=ACC,w=2,r=10); ct(d,121,265,'HARDWARE INFO  >',F_SM,ACC)
+    rr(d,(248,244,470,286),fill=TILE,outline=(70,130,235),w=2,r=10); ct(d,359,260,'PORTING REF  >',F_SM,(120,180,255)); ct(d,359,276,'CC1101/PN532/Flipper',F_TINY,DIM)
 hw_lines=[]
 def hwinfo_collect():
     global hw_lines
@@ -571,9 +586,59 @@ def draw_hwinfo(d):
     y=40
     for k,v in hw_lines:
         lt(d,16,y,k,F_SM,(DIM if k==' ' else ACC)); lt(d,150,y,str(v)[:42],F_SM,FG); y+=20
-    d.line([(10,y+1),(W-10,y+1)],fill=LINE)
-    lt(d,16,y+9,'full byte-ref (CC1101 / PN532 / Flipper porting):',F_TINY,DIM)
-    lt(d,16,y+23,'~/acid-hwref.html  +  acid-hwref.pdf',F_SM,ACC)
+    rr(d,(10,286,470,314),fill=TILE,outline=(70,130,235),w=2,r=8)
+    ct(d,240,300,'VIEW PORTING REFERENCE  (CC1101 / PN532 / Flipper)  >',F_TINY,(120,180,255))
+# ---- on-device Porting Reference viewer (renders acid-hwref.py's content, same as the PDF) ----
+hwref_blocks=None; hwref_flat=[]; hwref_page=0; HWREF_PER=14
+def _hw_wrap(s,n):
+    out=[]
+    for para in s.split('\n'):
+        if not para: out.append(''); continue
+        w=''
+        for word in para.split(' '):
+            if len(w)+len(word)+1<=n: w=(w+' '+word).strip()
+            else:
+                if w: out.append(w)
+                while len(word)>n: out.append(word[:n]); word=word[n:]
+                w=word
+        out.append(w)
+    return out
+def hwref_load():
+    global hwref_blocks,hwref_flat
+    try:
+        import importlib.util as _ilu
+        spec=_ilu.spec_from_file_location('acidhwref','/usr/local/bin/acid-hwref.py')
+        m=_ilu.module_from_spec(spec); spec.loader.exec_module(m)
+        B=m.content(m.live())
+    except Exception as e:
+        B=[('h1','REFERENCE UNAVAILABLE'),('b','could not load acid-hwref.py:'),('b',str(e)[:52])]
+    flat=[]
+    for kind,txt in B:
+        if kind in ('sp','rule'): flat.append((0,'',kind)); continue
+        ind=14 if kind=='h1' else 22 if kind=='h2' else 26
+        for wl in _hw_wrap(txt,54 if kind in ('h1','h2','b') else 58): flat.append((ind,wl,kind))
+    hwref_flat=flat; hwref_blocks=B
+def draw_hwref(d):
+    global hwref_page
+    topbar(d,'PORTING REFERENCE')
+    if hwref_blocks is None:
+        ct(d,W//2,150,'building reference...',F_NM,DIM); ct(d,W//2,172,'reading live hardware (~6s)',F_SM,DIM); return
+    total=max(1,(len(hwref_flat)+HWREF_PER-1)//HWREF_PER); hwref_page=min(max(hwref_page,0),total-1)
+    start=hwref_page*HWREF_PER; y=36
+    for x,txt,kind in hwref_flat[start:start+HWREF_PER]:
+        if kind=='rule': d.line([(14,y+8),(W-14,y+8)],fill=LINE)
+        elif txt:
+            col=ACC if kind=='h1' else (70,130,235) if kind=='h2' else (150,200,150) if kind=='m' else FG
+            lt(d,x,y,txt[:60],F_SM,col)
+        y+=18
+    by=H-24
+    rr(d,(10,by,120,by+21),outline=LINE,w=1,r=6); ct(d,65,by+10,'< PREV',F_SM,FG if hwref_page>0 else DIM)
+    ct(d,240,by+10,'%d / %d'%(hwref_page+1,total),F_SM,FG)
+    rr(d,(360,by,470,by+21),outline=LINE,w=1,r=6); ct(d,415,by+10,'NEXT >',F_SM,FG if hwref_page<total-1 else DIM)
+def hwref_open():
+    global hwref_page,screen
+    hwref_page=0; screen='hwref'
+    if hwref_blocks is None: threading.Thread(target=hwref_load,daemon=True).start()
 RADAR_SUBS=[('All Watch','all','active'),('Nearby Devices','nearby','active'),('Deauth Detector','deauth','active'),('BLE Spam Detector','blespam','active'),('Flipper Detector','flipper','active'),('Evil-Twin Detector','eviltwin','active')]
 RADAR_DESC={'all':'every detector at once','nearby':'WiFi + BLE devices around you','deauth':'deauth/disassoc flood (2.4+5G)','blespam':'BLE advertising spam flood','flipper':'Flipper Zero presence + BLE spam','eviltwin':'rogue AP / evil twin'}
 RADAR_CW=(W-16)//2; RADAR_Y0=54; RADAR_CH=80
@@ -1171,10 +1236,14 @@ def draw_handshake(d):
     elif r.startswith('no capture') or r.startswith('FAIL'): rr(d,(8,276,472,300),fill=(90,30,30),r=6); ct(d,W//2,288,r[:52],F_SM,(255,180,180))
     elif r and ('capturing' in r or r=='starting'): ct(d,W//2,288,'hunting... '+r[:38],F_SM,ACC)
     elif hs_status and time.time()-hs_status_t<30: ct(d,W//2,288,hs_status[:52],F_SM,ACC)
+BLE_PER_PAGE=6
 def draw_ble_scan(d):
+    global ble_page
     d.rectangle((0,0,W,28),fill=BARBG); d.line([(0,28),(W,28)],fill=LINE)
     rr(d,(6,4,92,24),outline=ACC,w=1,r=5); ct(d,49,15,'< back',F_SM,ACC); ct(d,W//2,15,'BLE SCAN',F_TIT,FG); learn_btn(d)
-    scanning=ble_scanning(); devs=ble_devices(7); cnt=ble_dev_count()
+    scanning=ble_scanning(); cnt=ble_dev_count()
+    total=max(1,(cnt+BLE_PER_PAGE-1)//BLE_PER_PAGE); ble_page=min(max(ble_page,0),total-1)
+    start=ble_page*BLE_PER_PAGE; devs=ble_devices(BLE_PER_PAGE,start)
     s=('scanning...' if scanning else '%d found'%cnt); bb=d.textbbox((0,0),s,font=F_SM); lt(d,W-12-(bb[2]-bb[0]),15,s,F_SM,ACC)
     rr(d,(10,34,150,62),fill=(30,120,210),r=7); ct(d,80,48,'SCAN',F_NM,(240,248,255))
     lt(d,165,48,'nearby Bluetooth LE',F_SM,DIM)
@@ -1189,6 +1258,11 @@ def draw_ble_scan(d):
         lt(d,32,y+23,mac+'  '+atype,F_TINY,DIM)
         info='%sdBm'%rssi; bb=d.textbbox((0,0),info,font=F_SM); lt(d,W-12-(bb[2]-bb[0]),y+15,info,F_SM,(sc))
         d.line([(8,y+31),(W-8,y+31)],fill=LINE); y+=32
+    if cnt>BLE_PER_PAGE:
+        by=H-24
+        rr(d,(10,by,120,by+21),fill=TILE,outline=LINE,w=1,r=6); ct(d,65,by+10,'< PREV',F_SM,FG if ble_page>0 else DIM)
+        ct(d,240,by+10,'%d / %d'%(ble_page+1,total),F_SM,FG)
+        rr(d,(360,by,470,by+21),fill=TILE,outline=LINE,w=1,r=6); ct(d,415,by+10,'NEXT >',F_SM,FG if ble_page<total-1 else DIM)
 def ble_inspect_start(mac):
     try: open('/tmp/acid_ble_inspect_status','w').write('connecting')
     except Exception: pass
@@ -1340,7 +1414,7 @@ screen='home'; cnt=0; last_h=0.0; mi=0; _showtap=[-1,-1,0.0]; cal_raws=[]; _last
 ep_ssid='Free WiFi'; ep_tpl='wifi'; ep_ch=6; ep_att=1; ep_pass=False; ep_run=False; ep_status=''; ep_status_t=0.0
 hs_off=0; hs_status=''; hs_status_t=0.0; hs_run=False
 ble_status=''; ble_status_t=0.0; ble_spam_run=False; ble_mode='sink'
-ble_insp_mac=''; insp_off=0
+ble_insp_mac=''; insp_off=0; ble_page=0; learn_off=0
 radar_sweep=0.0; radar_ble_t=0.0; radar_img=None; radar_img_t=0.0; radar_img_theme=None
 ssh_iface='?'; mon_iface='?'; active_radio=''; radio_rows=[]
 svc_t=0.0; sys_confirm=''; sys_confirm_t=0.0
@@ -1356,7 +1430,7 @@ while True:
         try:
             if os.path.exists('/tmp/acid_screen'):
                 _v=open('/tmp/acid_screen').read().strip(); os.remove('/tmp/acid_screen')
-                if _v.startswith('learn:') and _v.split(':',1)[1] in LEARN: learn_topic=_v.split(':',1)[1]; screen='learn'
+                if _v.startswith('learn:') and _v.split(':',1)[1] in LEARN: learn_topic=_v.split(':',1)[1]; learn_off=0; screen='learn'
                 else: screen=_v
                 if screen=='calibrate': cal_raws=[]
                 elif screen=='HWInfo': hwinfo_collect()
@@ -1398,7 +1472,7 @@ while True:
                     if 0<=col<COLS and 0<=row<ROWS and 0<=idx<len(GRID):
                         screen=GRID[idx][0]
                         if screen=='WiFi': wifi_off=0; wifi_t=0.0
-                        elif screen=='BLE Scan': ble_scan_start()
+                        elif screen=='BLE Scan': ble_page=0; ble_scan_start()
                         elif screen=='Pwnagotchi': pwn_img=None
                         elif screen in NATIVE: run_native(screen); screen='home'
                         elif screen in PLUGINS and hasattr(PLUGINS[screen],'on_enter'):
@@ -1406,13 +1480,14 @@ while True:
                             except Exception: pass
             else:
                 if screen in LEARN and ty<=26 and 96<=tx<=148:
-                    if now-_last_act>0.3: _last_act=now; learn_topic=screen; screen='learn'
+                    if now-_last_act>0.3: _last_act=now; learn_topic=screen; learn_off=0; screen='learn'
                 elif ty<=40 and tx<=160:
                     if screen=='BLE Spam' and ble_spam_running(): ble_spam_stop()
                     if screen=='WiFiKey' and kb_target=='epssid': screen='Evil AP'
                     elif screen in ('WiFiClients','WiFiKey'): screen='WiFi'
                     elif screen=='System': screen='Settings'
                     elif screen=='HWInfo': screen='About'
+                    elif screen=='hwref': screen='About'
                     elif screen=='WiFiStatus': screen='Settings'
                     elif screen=='WiFiRoles': screen='Settings'
                     elif screen=='BLE Inspect': screen='BLE Scan'
@@ -1423,8 +1498,16 @@ while True:
                             try: PLUGINS[screen].on_exit(CTX)   # release serial port etc.
                             except Exception: pass
                         screen='home'
-                elif screen=='About' and 252<=ty<=286 and tx>=130:
-                    if now-_last_act>0.4: _last_act=now; screen='HWInfo'; hwinfo_collect()
+                elif screen=='About' and 244<=ty<=286 and now-_last_act>0.4:
+                    _last_act=now
+                    if tx<=232: screen='HWInfo'; hwinfo_collect()
+                    elif tx>=248: hwref_open()
+                elif screen=='HWInfo' and 286<=ty<=314 and now-_last_act>0.4:
+                    _last_act=now; hwref_open()
+                elif screen=='hwref' and hwref_blocks is not None and H-24<=ty<=H-2 and now-_last_act>0.2:
+                    _htot=max(1,(len(hwref_flat)+HWREF_PER-1)//HWREF_PER)
+                    if tx<=120 and hwref_page>0: _last_act=now; hwref_page-=1
+                    elif tx>=360 and hwref_page<_htot-1: _last_act=now; hwref_page+=1
                 elif screen=='Settings' and 44<=ty<=166:
                     if now-_last_act>0.4: theme='light' if theme=='dark' else 'dark'; apply_theme(theme); save_theme(); _last_act=now
                 elif screen=='Settings' and 180<=ty<=224:
@@ -1536,12 +1619,22 @@ while True:
                         if tx<240: hs_export()
                         else: hs_status='pull *.22000 then: hashcat -m22000 file wordlist'; hs_status_t=now
                 elif screen=='BLE Scan':
+                    _bcnt=ble_dev_count(); _btot=max(1,(_bcnt+BLE_PER_PAGE-1)//BLE_PER_PAGE)
                     if 34<=ty<=62 and tx<=150 and now-_last_act>0.5:
                         _last_act=now; ble_scan_start()
-                    elif ty>=70 and now-_last_act>0.3:
-                        _idx=int((ty-70)//32); _dv=ble_devices(7)
+                    elif _bcnt>BLE_PER_PAGE and H-24<=ty<=H-2 and now-_last_act>0.25:
+                        if tx<=120 and ble_page>0: _last_act=now; ble_page-=1
+                        elif tx>=360 and ble_page<_btot-1: _last_act=now; ble_page+=1
+                    elif 70<=ty<H-26 and now-_last_act>0.3:
+                        _idx=int((ty-70)//32); _dv=ble_devices(BLE_PER_PAGE,ble_page*BLE_PER_PAGE)
                         if 0<=_idx<len(_dv):
                             _last_act=now; ble_insp_mac=_dv[_idx][0]; insp_off=0; screen='BLE Inspect'; ble_inspect_start(ble_insp_mac)
+                elif screen=='learn':
+                    _li=LEARN.get(learn_topic,{}); _ll=3+len(_li.get('how',[]))+len(_li.get('defend',[]))
+                    if _ll>LEARN_VIS and H-24<=ty<=H-2 and now-_last_act>0.2:
+                        _mo=max(0,_ll-LEARN_VIS); _st=max(1,LEARN_VIS-2)
+                        if tx<=120 and learn_off>0: _last_act=now; learn_off=max(0,learn_off-_st)
+                        elif tx>=360 and learn_off<_mo: _last_act=now; learn_off=min(_mo,learn_off+_st)
                 elif screen=='BLE Inspect':
                     if H-48<=ty<=H-26 and now-_last_act>0.2:
                         _last_act=now
@@ -1609,6 +1702,7 @@ while True:
             elif screen=='consent': draw_consent(d)
             elif screen=='learn': draw_learn(d)
             elif screen=='About': draw_about(d)
+            elif screen=='hwref': draw_hwref(d)
             elif screen=='Radar': draw_radar(d)
             elif screen=='Radar:all': draw_radar_all(d)
             elif screen=='Radar:nearby': draw_radar_nearby(d)
@@ -1638,13 +1732,20 @@ while True:
                 ap=next((a for a in APPS if a[0]==screen),None)
                 if ap: draw_soon(d,ap[0],ap[1],ap[2])
                 else: screen='home'; draw_home(d,mi)
-            d.rectangle((0,H-18,W,H),fill=BARBG); d.line([(0,H-18),(W,H-18)],fill=LINE)
-            if cal_msg and now-cal_msg_t<6: ct(d,W//2,H-8,cal_msg,F_SM,ACC)
-            else:
-                lt(d,10,H-9,'IP '+cur_ip+((' ['+ssh_iface+']') if ssh_iface not in ('','?') else ''),F_SM,(FG if cur_ip!='-' else DIM))
-                if active_radio: ct(d,W//2+20,H-9,('use: '+active_radio)[:30],F_SM,(235,180,40))
-                nc=(25,200,121) if net_state else (235,80,80)
-                d.ellipse((W-94,H-13,W-86,H-5),fill=nc); lt(d,W-80,H-9,'NET '+('ON' if net_state else 'OFF'),F_SM,DIM)
+            # Bottom footer: the IP/NET bar is HOME-ONLY (on internal screens it would
+            # cover PREV/NEXT + UP/DOWN page bars and clip content). The calibration
+            # toast stays transient on any screen.
+            if screen=='home':
+                d.rectangle((0,H-18,W,H),fill=BARBG); d.line([(0,H-18),(W,H-18)],fill=LINE)
+                if cal_msg and now-cal_msg_t<6: ct(d,W//2,H-8,cal_msg,F_SM,ACC)
+                else:
+                    lt(d,10,H-9,'IP '+cur_ip+((' ['+ssh_iface+']') if ssh_iface not in ('','?') else ''),F_SM,(FG if cur_ip!='-' else DIM))
+                    if active_radio: ct(d,W//2+20,H-9,('use: '+active_radio)[:30],F_SM,(235,180,40))
+                    nc=(25,200,121) if net_state else (235,80,80)
+                    d.ellipse((W-94,H-13,W-86,H-5),fill=nc); lt(d,W-80,H-9,'NET '+('ON' if net_state else 'OFF'),F_SM,DIM)
+            elif cal_msg and now-cal_msg_t<6:
+                d.rectangle((0,H-18,W,H),fill=BARBG); d.line([(0,H-18),(W,H-18)],fill=LINE)
+                ct(d,W//2,H-8,cal_msg,F_SM,ACC)
             with open(FB,'wb') as f: f.write(pack(img))
     except Exception: pass
     cnt+=1; time.sleep(TICK)

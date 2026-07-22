@@ -33,9 +33,10 @@ KB = ['1234567890', 'QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM']
 _ir = None
 _busy = False
 _status = 'RECORD a remote, or use REMOTES'
-_view = 'main'          # main | browse | remote | presets | savename
+_view = 'main'          # main | browse | remote | presets | savename | info
 _last = None             # last captured/loaded signal dict (Flipper-shaped)
 _wave = []                # pulse list for the graph
+_info_off = 0             # scroll offset for the (i) Learn screen
 
 _browse_rel = ''             # current folder, relative to SAVE_DIR ('' = root), '/' separated
 _browse_mode = 'view'          # 'view' (REMOTES - open to play) | 'pick' (SAVE - open to attach)
@@ -389,7 +390,13 @@ def _draw_wave(d, ctx, box, data):
 
 # ---------- view: MAIN (capture) ----------
 def _draw_main(d, ctx):
-    ctx.topbar(d, 'IR REMOTE')
+    # Custom top bar: ctx.topbar centers the title, leaving no gap for an (i) beside
+    # PRESETS/REMOTES, and a plugin's (i) must sit at tx>160 (the launcher steals a
+    # ty<=40 & tx<=160 tap for its own back-to-Home before the plugin ever sees it).
+    d.rectangle((0, 0, ctx.W, 28), fill=ctx.BARBG); d.line([(0, 28), (ctx.W, 28)], fill=ctx.LINE)
+    ctx.rr(d, (6, 4, 92, 24), outline=ctx.ACC, w=1, r=5); ctx.ct(d, 49, 15, '< back', ctx.F_SM, ctx.ACC)
+    ctx.ct(d, 158, 14, 'IR REMOTE', ctx.F_TIT, ctx.FG)
+    ctx.rr(d, (226, 4, 266, 24), outline=(70, 130, 235), w=1, r=5); ctx.ct(d, 246, 14, '(i)', ctx.F_SM, (70, 130, 235))
     _btn(ctx, d, (286, 3, 366, 25), 'PRESETS', (60, 45, 35), (245, 180, 120), ctx.F_SM)
     _btn(ctx, d, (370, 3, 472, 25), 'REMOTES', (45, 52, 68), ctx.ACC, ctx.F_SM)
     _draw_wave(d, ctx, (8, 34, 472, 150), _wave)
@@ -408,7 +415,9 @@ def _draw_main(d, ctx):
 
 
 def _touch_main(tx, ty, ctx):
-    global _view, _name, _save_ctx, _browse_mode, _browse_rel, _browse_page
+    global _view, _name, _save_ctx, _browse_mode, _browse_rel, _browse_page, _info_off
+    if ty <= 24 and 226 <= tx <= 266 and ctx.debounce(0.3):
+        _info_off = 0; _view = 'info'; ctx.mark_dirty(); return
     if ty <= 25 and 286 <= tx <= 366 and ctx.debounce(0.3):
         _view = 'presets'; ctx.mark_dirty(); return
     if ty <= 25 and tx >= 370 and ctx.debounce(0.3):
@@ -665,12 +674,76 @@ def _touch_savename(tx, ty, ctx):
                 ctx.mark_dirty()
 
 
+# ---------- view: INFO (educational Learn, scrollable) ----------
+# (indent, text, colorkey)  colorkey: 'fg' | 'dim' | an RGB tuple (section header)
+IR_INFO = [
+    (14, 'WHAT IS THIS?', (150, 200, 255)),
+    (20, 'Records and replays infrared remote signals.', 'fg'),
+    (20, 'An IR remote pulses an LED at ~38kHz, encoding', 'fg'),
+    (20, 'button codes (NEC, RC5, Sony SIRC, ...). This', 'fg'),
+    (20, 'captures that pulse train and plays it back.', 'fg'),
+    (0, '', 'fg'),
+    (14, 'WHY IS IT HERE? (educational)', (120, 220, 150)),
+    (20, 'To learn how remotes work - and that IR carries', 'fg'),
+    (20, 'NO authentication. Anyone in line-of-sight can', 'fg'),
+    (20, 'record a button and replay it later.', 'fg'),
+    (0, '', 'fg'),
+    (14, 'HOW TO DETECT / DEFEND', (235, 180, 40)),
+    (20, '- IR is line-of-sight + short range: control', 'dim'),
+    (20, '  physical access to the room / device.', 'dim'),
+    (20, '- Never use plain IR for access control (locks,', 'dim'),
+    (20, '  gates) - use rolling-code / encrypted RF.', 'dim'),
+    (20, '- TV/AC replay is low-risk: a captured code just', 'dim'),
+    (20, '  repeats a keypress; it cannot read state.', 'dim'),
+    (0, '', 'fg'),
+    (14, 'THE RULE', (255, 120, 120)),
+    (20, 'Use ONLY on devices you OWN or are authorized', 'fg'),
+    (20, 'to test.', 'fg'),
+]
+_INFO_VIS = 13
+
+
+def _draw_info(d, ctx):
+    global _info_off
+    ctx.topbar(d, 'IR REMOTE - LEARN')
+    ctx.rr(d, (418, 4, 472, 24), outline=ctx.ACC, w=1, r=8)
+    ctx.ct(d, 445, 14, 'back', ctx.F_TINY, ctx.ACC)
+    total = len(IR_INFO); maxoff = max(0, total - _INFO_VIS)
+    _info_off = min(max(_info_off, 0), maxoff)
+    y = 38
+    for indent, txt, ck in IR_INFO[_info_off:_info_off + _INFO_VIS]:
+        if txt:
+            col = ctx.FG if ck == 'fg' else ctx.DIM if ck == 'dim' else ck
+            ctx.lt(d, indent, y, txt, ctx.F_SM, col)
+        y += 18
+    if total > _INFO_VIS:
+        by = ctx.H - 24
+        ctx.rr(d, (10, by, 120, by + 21), outline=ctx.LINE, w=1, r=6)
+        ctx.ct(d, 65, by + 10, 'UP', ctx.F_SM, ctx.FG if _info_off > 0 else ctx.DIM)
+        ctx.ct(d, 240, by + 10, '%d-%d / %d' % (_info_off + 1, min(_info_off + _INFO_VIS, total), total), ctx.F_TINY, ctx.DIM)
+        ctx.rr(d, (360, by, 470, by + 21), outline=ctx.LINE, w=1, r=6)
+        ctx.ct(d, 415, by + 10, 'DOWN', ctx.F_SM, ctx.FG if _info_off < maxoff else ctx.DIM)
+
+
+def _touch_info(tx, ty, ctx):
+    global _view, _info_off
+    if ty <= 24 and tx >= 418 and ctx.debounce(0.3):
+        _view = 'main'; ctx.mark_dirty(); return
+    total = len(IR_INFO); maxoff = max(0, total - _INFO_VIS)
+    if total > _INFO_VIS and ctx.H - 24 <= ty <= ctx.H - 2 and ctx.debounce(0.2):
+        st = max(1, _INFO_VIS - 2)
+        if tx <= 120 and _info_off > 0:
+            _info_off = max(0, _info_off - st); ctx.mark_dirty()
+        elif tx >= 360 and _info_off < maxoff:
+            _info_off = min(maxoff, _info_off + st); ctx.mark_dirty()
+
+
 # ---------- dispatch ----------
 def draw(d, ctx):
-    {'browse': _draw_browse, 'remote': _draw_remote,
+    {'browse': _draw_browse, 'remote': _draw_remote, 'info': _draw_info,
      'presets': _draw_presets, 'savename': _draw_savename}.get(_view, _draw_main)(d, ctx)
 
 
 def handle_touch(tx, ty, ctx):
-    {'browse': _touch_browse, 'remote': _touch_remote,
+    {'browse': _touch_browse, 'remote': _touch_remote, 'info': _touch_info,
      'presets': _touch_presets, 'savename': _touch_savename}.get(_view, _touch_main)(tx, ty, ctx)
