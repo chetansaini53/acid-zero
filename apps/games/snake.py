@@ -67,7 +67,9 @@ def _setdir(dc, dr):
 # ---------- plugin contract ----------
 def _tick(g):
     while _run and g == _gen:
-        time.sleep(max(0.07, 0.17 - _score * 0.005))
+        # ~70% slower than before; floor 0.20s stays at/above the ~6-7fps SPI refresh
+        # so every step actually renders (no multi-cell jump / jitter).
+        time.sleep(max(0.20, 0.50 - _score * 0.006))
         if _run and g == _gen and not _over:
             _step()
             if _ctx is not None:
