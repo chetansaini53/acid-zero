@@ -30,9 +30,16 @@ try:
 except Exception:
     acid_wifiroles = None
 
+try:
+    import acid_apcreds            # shared creds store (written by the Flasher)
+except Exception:
+    acid_apcreds = None
+
 # ---- Pico AP link (dedicated worker adapter, kept off the main SSH uplink) ----
-AP_SSID = 'AcidZero-Duck'          # must match firmware AP_SSID
-AP_PSK = 'acidzero1337'            # must match firmware AP_PASSWORD (WPA2, >= 8 chars)
+# AP_SSID/AP_PSK are the DEFAULTS only; the live creds come from acid_apcreds
+# (see ap_creds()), so whatever the Flasher wrote is exactly what CONNECT joins.
+AP_SSID = 'AcidZero-Duck'          # default AP SSID (matches firmware default)
+AP_PSK = 'acidzero1337'            # default AP password (WPA2, >= 8 chars)
 AP_IFACE_FALLBACK = 'wlan2'        # used only if the role resolver is unavailable
 AP_CONN = 'acidzero-duck'          # NetworkManager connection profile name
 PI_ADDR = '192.168.4.2/24'         # static IP for the worker adapter on the Pico AP subnet
@@ -56,6 +63,17 @@ PORT = 1337
 SCRIPTS_DIR = '/home/ella3/acid_badusb'    # drop Flipper .txt DuckyScripts here
 
 
+def ap_creds() -> Tuple[str, str]:
+    """Live Pico AP (ssid, psk) - shared with the Flasher via acid_apcreds.
+    Falls back to the built-in defaults if the store is unavailable."""
+    if acid_apcreds is not None:
+        try:
+            return acid_apcreds.load()
+        except Exception:
+            pass
+    return AP_SSID, AP_PSK
+
+
 class BadUSBError(RuntimeError):
     pass
 
@@ -74,21 +92,25 @@ def _nmcli(*args: str, timeout: float = 25.0) -> Tuple[int, str]:
 def ap_visible() -> bool:
     """True if the Pico's AP is currently broadcasting (seen on the worker iface)."""
     iface = _ap_iface()
+    ssid, _psk = ap_creds()
     _nmcli('dev', 'set', iface, 'managed', 'yes')
     _nmcli('dev', 'wifi', 'rescan', 'ifname', iface)
-    _rc, out = _nmcli('-t', '-f', 'SSID', 'dev', 'wifi', 'list', 'ifname', iface)
-    return AP_SSID in [ln.strip() for ln in out.split('\n')]
+    # -e no: don't backslash-escape the terse output, so an SSID containing ':' or
+    # '\' compares correctly (one SSID per line here, so disabling escaping is safe).
+    _rc, out = _nmcli('-t', '-e', 'no', '-f', 'SSID', 'dev', 'wifi', 'list', 'ifname', iface)
+    return ssid in [ln.strip() for ln in out.split('\n')]
 
 
 def link_connect() -> Tuple[bool, str]:
     """Join the Pico AP on the dedicated worker adapter (static IP, no default route)."""
     iface = _ap_iface()
+    ssid, psk = ap_creds()
     _nmcli('dev', 'set', iface, 'managed', 'yes')
     if not ap_visible():
-        return False, "'%s' not found - power the Pico, wait ~20s" % AP_SSID
+        return False, "'%s' not found - power the Pico, wait ~20s" % ssid
     _nmcli('con', 'delete', AP_CONN)   # idempotent recreate
     rc, _out = _nmcli('con', 'add', 'type', 'wifi', 'con-name', AP_CONN, 'ifname', iface,
-                      'ssid', AP_SSID, 'wifi-sec.key-mgmt', 'wpa-psk', 'wifi-sec.psk', AP_PSK,
+                      'ssid', ssid, 'wifi-sec.key-mgmt', 'wpa-psk', 'wifi-sec.psk', psk,
                       'ipv4.method', 'manual', 'ipv4.addresses', PI_ADDR, 'ipv4.never-default', 'yes',
                       'ipv6.method', 'ignore', 'connection.autoconnect', 'no')
     if rc != 0:

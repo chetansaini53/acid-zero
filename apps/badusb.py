@@ -16,7 +16,7 @@ for _p in ('/usr/local/bin', '/usr/local/lib/acid-apps', '/home/ella3'):
         sys.path.insert(0, _p)
 try:
     from acid_badusb import (BadUSB, BadUSBError, link_connect, link_disconnect,
-                             link_active, AP_SSID, HOST)
+                             link_active, ap_creds, AP_SSID, HOST)
 except Exception:
     BadUSB = None
     AP_SSID = 'AcidZero-Duck'
@@ -34,11 +34,23 @@ except Exception:
     def link_active():
         return False
 
+    def ap_creds():
+        return AP_SSID, 'acidzero1337'
+
+try:
+    import acid_apcreds as C          # shared creds store (validate + save)
+except Exception:
+    C = None
+try:
+    import acid_kbd                   # shared on-screen keyboard
+except Exception:
+    acid_kbd = None
+
 META = {'name': 'Bad USB', 'icon': 'badusb', 'color': (210, 90, 90)}
 
 SCRIPTS_DIR = '/home/ella3/acid_badusb'    # drop Flipper .txt DuckyScripts (and folders) here
 
-_view = 'main'          # main | info
+_view = 'main'          # main | info | creds | kb
 _browse_rel = ''         # current folder, relative to SCRIPTS_DIR ('' = root)
 _browse_entries = []      # [(is_dir, abs_path, name, count), ...] of the CURRENT folder only
 _browse_page = 0
@@ -48,6 +60,9 @@ _sel_name = ''
 _link = 'idle'            # idle | connecting | online | offline | disconnecting
 _status = 'CONNECT, then pick a payload'
 _busy = False
+_ap_ssid = 'AcidZero-Duck'   # live Pico AP creds (shared with the Flasher)
+_ap_psk = 'acidzero1337'
+_kb_target = ''           # 'ssid' | 'psk'  (which creds field the keyboard edits)
 
 
 def _set(ctx, s):
@@ -145,7 +160,7 @@ def _w_probe(ctx):
 def _w_connect(ctx):
     global _link
     _link = 'connecting'
-    _set(ctx, 'joining %s ...' % AP_SSID)
+    _set(ctx, 'joining %s ...' % _ap_ssid)
     ok, msg = link_connect() if BadUSB else (False, 'client missing')
     if not ok:
         _link = 'idle'
@@ -190,10 +205,16 @@ def _w_run(ctx, path, name):
 
 # ---------- lifecycle ----------
 def on_enter(ctx):
-    global _view, _browse_rel, _browse_page
+    global _view, _browse_rel, _browse_page, _ap_ssid, _ap_psk
     _view = 'main'
     _browse_rel = ''
     _browse_page = 0
+    try:
+        _ap_ssid, _ap_psk = ap_creds()    # what CONNECT will join (Flasher-shared)
+    except Exception:
+        pass
+    if acid_kbd:
+        acid_kbd.close()
     _refresh_browse()
     _spawn(_w_probe, ctx)
     ctx.mark_dirty()
@@ -202,6 +223,8 @@ def on_enter(ctx):
 # ---------- view: MAIN ----------
 def _draw_main(d, ctx):
     ctx.topbar(d, 'BAD USB')
+    ctx.rr(d, (344, 4, 410, 24), outline=(150, 190, 240), w=1, r=8)
+    ctx.ct(d, 377, 14, 'AP creds', ctx.F_TINY, (150, 190, 240))
     ctx.rr(d, (418, 4, 472, 24), outline=ctx.ACC, w=1, r=8)
     ctx.ct(d, 445, 14, '(i) info', ctx.F_TINY, ctx.ACC)
 
@@ -213,7 +236,7 @@ def _draw_main(d, ctx):
     if _link == 'online':
         c, txt = (30, 200, 121), 'LINK: ONLINE  -  Pico @ %s' % HOST
     elif _link == 'connecting':
-        c, txt = (235, 180, 40), 'LINK: connecting to %s ...' % AP_SSID
+        c, txt = (235, 180, 40), 'LINK: connecting to %s ...' % _ap_ssid
     elif _link == 'disconnecting':
         c, txt = (235, 180, 40), 'LINK: disconnecting ...'
     elif _link == 'offline':
@@ -280,6 +303,10 @@ def _touch_main(tx, ty, ctx):
     global _view, _browse_rel, _browse_page, _sel_path, _sel_name, _busy
     if ty <= 24 and tx >= 418 and ctx.debounce(0.3):
         _view = 'info'
+        ctx.mark_dirty()
+        return
+    if ty <= 24 and 344 <= tx <= 410 and ctx.debounce(0.3):
+        _view = 'creds'
         ctx.mark_dirty()
         return
     busy = _link in ('connecting', 'disconnecting')
@@ -385,10 +412,91 @@ def _touch_info(tx, ty, ctx):
         ctx.mark_dirty()
 
 
+# ---------- view: PICO AP CREDS (manual entry; shared with the Flasher) ----------
+def _draw_creds(d, ctx):
+    ctx.topbar(d, 'PICO AP CREDS')
+    ctx.rr(d, (8, 32, 472, 80), fill=(22, 34, 52), outline=(70, 110, 170), w=1, r=6)
+    ctx.lt(d, 16, 47, "The Pico's own WiFi AP - this is what CONNECT joins.", ctx.F_TINY, (170, 200, 240))
+    ctx.lt(d, 16, 64, 'Set them to match what you flashed (shared with Flasher).', ctx.F_TINY, (150, 175, 210))
+    ctx.lt(d, 20, 105, 'SSID', ctx.F_SM, ctx.DIM)
+    ctx.rr(d, (92, 92, 420, 118), fill=ctx.PANEL, outline=ctx.ACC, w=1, r=6)
+    ctx.lt(d, 102, 105, _ap_ssid[:34], ctx.F_NM, ctx.FG)
+    ctx.lt(d, 20, 151, 'PW', ctx.F_SM, ctx.DIM)
+    ctx.rr(d, (92, 138, 420, 164), fill=ctx.PANEL, outline=ctx.ACC, w=1, r=6)
+    ctx.lt(d, 102, 151, _ap_psk[:34], ctx.F_NM, ctx.FG)
+    ctx.ct(d, 240, 194, 'tap a field to edit - saved instantly for the next CONNECT', ctx.F_TINY, ctx.DIM)
+    ctx.ct(d, 240, 214, 'WPA2 password must be 8-63 characters', ctx.F_TINY, ctx.DIM)
+    ctx.rr(d, (176, 262, 304, 296), fill=(30, 90, 60), outline=ctx.ACC, w=1, r=8)
+    ctx.ct(d, 240, 279, 'DONE', ctx.F_NM, ctx.FG)
+    ctx.ct(d, 240, 312, _status[:58], ctx.F_TINY, ctx.DIM)
+
+
+def _touch_creds(tx, ty, ctx):
+    global _view, _kb_target
+    if 92 <= ty <= 118 and 92 <= tx <= 420 and ctx.debounce(0.3):
+        if acid_kbd:
+            _kb_target = 'ssid'; acid_kbd.start('SSID', _ap_ssid, maxlen=32); _view = 'kb'
+        ctx.mark_dirty(); return
+    if 138 <= ty <= 164 and 92 <= tx <= 420 and ctx.debounce(0.3):
+        if acid_kbd:
+            _kb_target = 'psk'; acid_kbd.start('PASSWORD', _ap_psk, maxlen=63); _view = 'kb'
+        ctx.mark_dirty(); return
+    if 262 <= ty <= 296 and 176 <= tx <= 304 and ctx.debounce(0.3):
+        _view = 'main'; ctx.mark_dirty()
+
+
+def _kb_commit(value, ctx):
+    """Apply an edited SSID/PW: validate, persist to the shared store, update display."""
+    global _ap_ssid, _ap_psk
+    if _kb_target == 'ssid':
+        ns, np = (value or 'AcidZero-Duck'), _ap_psk
+    else:
+        ns, np = _ap_ssid, (value or 'acidzero1337')
+    if C:
+        okv, why = C.validate(ns, np)
+        if not okv:
+            _set(ctx, why)                 # reject; keep the old values
+            return
+        C.save(ns, np)
+        _ap_ssid, _ap_psk = ns, np
+        # If the link is already up it still uses the OLD profile until a reconnect.
+        if _link in ('online', 'offline'):
+            _set(ctx, 'saved - DISCONNECT then CONNECT to apply')
+        else:
+            _set(ctx, 'saved - CONNECT will use these')
+    else:
+        _ap_ssid, _ap_psk = ns, np
+        _set(ctx, 'set (store unavailable - CONNECT uses defaults)')
+
+
 # ---------- dispatch ----------
 def draw(d, ctx):
-    (_draw_info if _view == 'info' else _draw_main)(d, ctx)
+    if _view == 'kb' and acid_kbd:
+        acid_kbd.draw(d, ctx)
+    elif _view == 'creds':
+        _draw_creds(d, ctx)
+    elif _view == 'info':
+        _draw_info(d, ctx)
+    else:
+        _draw_main(d, ctx)
 
 
 def handle_touch(tx, ty, ctx):
-    (_touch_info if _view == 'info' else _touch_main)(tx, ty, ctx)
+    global _view
+    if _view == 'kb':
+        if not acid_kbd:
+            _view = 'creds'; ctx.mark_dirty(); return
+        r = acid_kbd.touch(tx, ty, ctx)
+        if r == 'editing':
+            return
+        if isinstance(r, tuple) and r[0] == 'ok':
+            _kb_commit(r[1], ctx)
+        _view = 'creds'; ctx.mark_dirty()
+        return
+    if _view == 'creds':
+        _touch_creds(tx, ty, ctx)
+        return
+    if _view == 'info':
+        _touch_info(tx, ty, ctx)
+        return
+    _touch_main(tx, ty, ctx)

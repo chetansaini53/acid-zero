@@ -92,6 +92,33 @@ needed to flash straight from this repo**:
   the main uplink); the Bad USB app's **CONNECT** button runs the join. Full link diagram:
   [docs/badusb-architecture.svg](docs/badusb-architecture.svg).
 
+### On-device Flasher (no laptop)
+
+The **Flasher** app flashes both co-processors straight from the handheld — SCAN
+(verify the right board) then FLASH. It ships the firmware it needs:
+
+```
+# esptool for the ESP32 flash - install where the launcher (root) can see it.
+# The launcher runs as root, so an "--user" install in your login account is NOT
+# enough; install into the system site-packages:
+sudo python3 -m pip install --break-system-packages esptool
+
+# bundle the flashable firmware for the Flasher
+sudo mkdir -p /usr/local/share/acid-firmware/pico-badusb
+sudo cp firmware/esp32-allinone/prebuilt/esp32-allinone.merged.bin /usr/local/share/acid-firmware/
+sudo cp firmware/circuitpython/circuitpython-pico2w.uf2            /usr/local/share/acid-firmware/
+sudo cp firmware/pico-badusb/code.py firmware/pico-badusb/boot.py  /usr/local/share/acid-firmware/pico-badusb/
+sudo cp -r firmware/pico-badusb/lib                                /usr/local/share/acid-firmware/pico-badusb/
+```
+
+The Pico's AP **SSID + password** are set in the Flasher (or the Bad USB app's
+**AP creds** screen) — they are written onto the Pico *and* saved to a shared store
+(`~/.acid_ap.json`, 0600), so the Bad USB **CONNECT** joins exactly what you flashed.
+A blank Pico gets the bundled CircuitPython `.uf2` (hold BOOTSEL while plugging in);
+a Pico already on CircuitPython is updated in place. See
+[firmware/circuitpython/README.md](firmware/circuitpython/README.md) and
+[THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md) for the bundled-binary provenance.
+
 ## 7. Adding apps (plugins)
 
 - **Python plugin:** drop a `.py` with a `META = {name, icon, color}` dict and a

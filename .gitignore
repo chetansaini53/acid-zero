@@ -25,6 +25,7 @@ acid_*.tmp
 
 # Local secrets / device config (keep these OUT of the repo)
 config.toml
+settings.toml
 *.key
 *_key
 .env

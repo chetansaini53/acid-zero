@@ -5,8 +5,10 @@
 # want to change the default AP name / password.
 #
 # Defaults (baked into code.py): SSID "AcidZero-Duck", password "acidzero1337".
-# If you change them here, ALSO update AP_SSID / AP_PSK in launcher/acid_badusb.py
-# so the Pi joins the right AP.
+# EASIEST: set the SSID/password in the on-device Flasher (or the Bad USB app's
+# "AP creds" screen) - it writes this file for you AND shares the creds so CONNECT
+# joins the right AP automatically. Only edit this file by hand if you flash the
+# Pico from a laptop; then set the same values in the Bad USB app's AP creds.
 #
 # Do NOT set CIRCUITPY_WIFI_SSID/PASSWORD here - that makes CircuitPython auto-join
 # a station network at boot, which fights AP mode.
