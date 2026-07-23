@@ -527,10 +527,9 @@ def build_grid(page=0):
 def draw_home(d,mi):
     d.rectangle((0,0,W,26),fill=BARBG); d.line([(0,26),(W,26)],fill=LINE)
     x=lt(d,9,13,'ACID',F_TIT,ACC); x=lt(d,x+8,13,'// zero',F_SM,DIM)
-    if PAGES>1: lt(d,x+10,13,'pg%d/%d'%(home_page+1,PAGES),F_SM,ACC)
-    ct(d,236,13,time.strftime('%H:%M   %a %d %b'),F_SM,FG)
+    ct(d,240,13,time.strftime('%H:%M   %a %d'),F_SM,FG)   # clock centered (page indicator moved to footer)
     rs='CPU '+str(cpu())+'%  CH '+str(chan())+'  '+str(temp())+'°  '+str(memp())+'%'
-    bb=d.textbbox((0,0),rs,font=F_SM); lt(d,W-12-(bb[2]-bb[0]),13,rs,F_SM,DIM)
+    bb=d.textbbox((0,0),rs,font=F_SM); lt(d,W-10-(bb[2]-bb[0]),13,rs,F_SM,DIM)
     d.rectangle((0,27,W,93),fill=PANEL); d.line([(0,94),(W,94)],fill=LINE)
     rr(d,(6,31,128,90),fill=TILE,outline=LINE,w=1,r=8)
     if face_img is not None:
@@ -1465,8 +1464,9 @@ while True:
                     except Exception: pass
                     screen='home'
             elif screen=='home':
-                if ty<26 and PAGES>1 and now-_last_act>0.3:
-                    _last_act=now; home_page=(home_page+1)%PAGES
+                if ty>=H-20 and PAGES>1 and now-_last_act>0.3:
+                    if 175<=tx<=228 and home_page>0: _last_act=now; home_page-=1
+                    elif 258<=tx<=311 and home_page<PAGES-1: _last_act=now; home_page+=1
                 elif ty>=GY:
                     col=int((tx-GX)//CW); row=int((ty-GY)//CH); idx=home_page*PER+row*COLS+col
                     if 0<=col<COLS and 0<=row<ROWS and 0<=idx<len(GRID):
@@ -1740,7 +1740,11 @@ while True:
                 if cal_msg and now-cal_msg_t<6: ct(d,W//2,H-8,cal_msg,F_SM,ACC)
                 else:
                     lt(d,10,H-9,'IP '+cur_ip+((' ['+ssh_iface+']') if ssh_iface not in ('','?') else ''),F_SM,(FG if cur_ip!='-' else DIM))
-                    if active_radio: ct(d,W//2+20,H-9,('use: '+active_radio)[:30],F_SM,(235,180,40))
+                    if PAGES>1:
+                        ct(d,200,H-9,'< PREV',F_SM,(FG if home_page>0 else DIM))
+                        ct(d,240,H-9,'%d/%d'%(home_page+1,PAGES),F_SM,ACC)
+                        ct(d,283,H-9,'NEXT >',F_SM,(FG if home_page<PAGES-1 else DIM))
+                    elif active_radio: ct(d,W//2+20,H-9,('use: '+active_radio)[:24],F_SM,(235,180,40))
                     nc=(25,200,121) if net_state else (235,80,80)
                     d.ellipse((W-94,H-13,W-86,H-5),fill=nc); lt(d,W-80,H-9,'NET '+('ON' if net_state else 'OFF'),F_SM,DIM)
             elif cal_msg and now-cal_msg_t<6:
