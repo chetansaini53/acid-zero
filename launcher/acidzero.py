@@ -527,18 +527,18 @@ def build_grid(page=0):
 def draw_home(d,mi):
     d.rectangle((0,0,W,26),fill=BARBG); d.line([(0,26),(W,26)],fill=LINE)
     x=lt(d,9,13,'ACID',F_TIT,ACC); x=lt(d,x+8,13,'// zero',F_SM,DIM)
-    ct(d,240,13,time.strftime('%H:%M   %a %d'),F_SM,FG)   # clock centered (page indicator moved to footer)
-    rs='CPU '+str(cpu())+'%  CH '+str(chan())+'  '+str(temp())+'°  '+str(memp())+'%'
-    bb=d.textbbox((0,0),rs,font=F_SM); lt(d,W-10-(bb[2]-bb[0]),13,rs,F_SM,DIM)
+    ct(d,240,13,time.strftime('%H:%M   %a %d %b'),F_SM,FG)   # clock centered; system stats moved to the panel
     d.rectangle((0,27,W,93),fill=PANEL); d.line([(0,94),(W,94)],fill=LINE)
     rr(d,(6,31,128,90),fill=TILE,outline=LINE,w=1,r=8)
     if face_img is not None:
         iw,ih=face_img.size; s=min(122/iw,59/ih)*0.8; fw=max(1,int(iw*s)); fh=max(1,int(ih*s))   # fit box, then 20% smaller
         d._image.paste(face_img.resize((fw,fh),Image.NEAREST),(6+(122-fw)//2,31+(59-fh)//2))   # horiz + vert center
-    lt(d,140,46,'acid',F_NM,FG); rr(d,(178,39,224,54),outline=ACC,w=1,r=4); ct(d,201,46,'AUTO',F_SM,ACC)
-    lt(d,140,70,MOODS[mi],F_SM,DIM)
-    ct(d,300,46,str(pwnd()),F_BIG,ACC); ct(d,300,68,'pwnd',F_SM,DIM)
-    ct(d,400,46,upt(),F_BIG,ACC); ct(d,400,68,'uptime',F_SM,DIM)
+    lt(d,140,45,'acid',F_NM,FG); rr(d,(176,38,220,53),outline=ACC,w=1,r=4); ct(d,198,46,'AUTO',F_TINY,ACC)
+    lt(d,140,68,MOODS[mi][:16],F_TINY,DIM)
+    _st=[('PWND',str(pwnd())),('UP',upt()),('CPU',str(cpu())+'%'),('MEM',str(memp())+'%'),('TEMP',str(temp())+'°')]
+    _sx=270
+    for _lb,_v in _st:
+        ct(d,_sx,45,str(_v)[:5],F_SM,ACC); ct(d,_sx,67,_lb,F_TINY,DIM); _sx+=45
     global grid_cache,grid_cache_theme,grid_cache_page
     if grid_cache is None or grid_cache_theme!=theme or grid_cache_page!=home_page:
         grid_cache=build_grid(home_page); grid_cache_theme=theme; grid_cache_page=home_page
