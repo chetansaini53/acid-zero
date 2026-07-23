@@ -20,8 +20,11 @@ _mods = {}          # key -> module (or None), loaded once
 _view = 'menu'      # menu | play
 _active = None      # active game module
 _active_name = ''
+_menu_page = 0
 
-COLS, ROWS = 3, 4
+MCOLS, MROWS = 3, 3
+PER_PAGE = MCOLS * MROWS
+GTOP, GBOT = 34, 26   # grid top offset, bottom reserved for the page bar
 
 
 def _load(key):
@@ -45,9 +48,10 @@ def _load(key):
 
 
 def on_enter(ctx):
-    global _view, _active
+    global _view, _active, _menu_page
     _view = 'menu'
     _active = None
+    _menu_page = 0
     ctx.mark_dirty()
 
 
@@ -60,43 +64,65 @@ def on_exit(ctx):
 
 
 # ---------- menu ----------
+def _pages():
+    return max(1, (len(ROSTER) + PER_PAGE - 1) // PER_PAGE)
+
+
 def _draw_menu(d, ctx):
+    global _menu_page
     ctx.topbar(d, 'GAMES')
     W = ctx.W
-    cw = (W - 16) // COLS
-    ch = (320 - 34) // ROWS
-    for i, (name, key) in enumerate(ROSTER):
-        c, r = i % COLS, i // COLS
-        x0, y0 = 8 + c * cw, 34 + r * ch
+    total = _pages()
+    _menu_page = min(max(_menu_page, 0), total - 1)
+    cw = (W - 16) // MCOLS
+    ch = (320 - GTOP - GBOT) // MROWS
+    start = _menu_page * PER_PAGE
+    for i, (name, key) in enumerate(ROSTER[start:start + PER_PAGE]):
+        c, r = i % MCOLS, i // MCOLS
+        x0, y0 = 8 + c * cw, GTOP + r * ch
         on = _load(key) is not None
         ctx.rr(d, (x0 + 4, y0 + 4, x0 + cw - 4, y0 + ch - 4), fill=ctx.TILE,
                outline=(ctx.ACC if on else ctx.LINE), w=(2 if on else 1), r=10)
         cx, cy = x0 + cw // 2, y0 + ch // 2
         ctx.ct(d, cx, cy - 8, name[:12], ctx.F_SM, (ctx.FG if on else ctx.DIM))
         ctx.ct(d, cx, cy + 12, ('PLAY' if on else 'SOON'), ctx.F_TINY, (ctx.ACC if on else (120, 130, 150)))
+    if total > 1:
+        by = 320 - 24
+        ctx.rr(d, (10, by, 120, by + 20), fill=ctx.TILE, outline=ctx.LINE, w=1, r=6)
+        ctx.ct(d, 65, by + 10, '< PREV', ctx.F_SM, ctx.FG if _menu_page > 0 else ctx.DIM)
+        ctx.ct(d, 240, by + 10, '%d / %d' % (_menu_page + 1, total), ctx.F_SM, ctx.FG)
+        ctx.rr(d, (360, by, 470, by + 20), fill=ctx.TILE, outline=ctx.LINE, w=1, r=6)
+        ctx.ct(d, 415, by + 10, 'NEXT >', ctx.F_SM, ctx.FG if _menu_page < total - 1 else ctx.DIM)
 
 
 def _touch_menu(tx, ty, ctx):
-    global _view, _active, _active_name
-    if ty < 34:
+    global _view, _active, _active_name, _menu_page
+    total = _pages()
+    if total > 1 and 320 - 24 <= ty <= 320 - 2 and ctx.debounce(0.25):
+        if tx <= 120 and _menu_page > 0:
+            _menu_page -= 1; ctx.mark_dirty()
+        elif tx >= 360 and _menu_page < total - 1:
+            _menu_page += 1; ctx.mark_dirty()
         return
-    W = ctx.W
-    cw = (W - 16) // COLS
-    ch = (320 - 34) // ROWS
+    if ty < GTOP:
+        return
+    cw = (ctx.W - 16) // MCOLS
+    ch = (320 - GTOP - GBOT) // MROWS
     c = (tx - 8) // cw
-    r = (ty - 34) // ch
-    i = r * COLS + c
-    if 0 <= c < COLS and 0 <= i < len(ROSTER) and ctx.debounce(0.3):
-        name, key = ROSTER[i]
-        m = _load(key)
-        if m is not None:
-            _active = m
-            _active_name = name
-            _view = 'play'
-            if hasattr(m, 'on_enter'):
-                try: m.on_enter(ctx)
-                except Exception: pass
-            ctx.mark_dirty()
+    r = (ty - GTOP) // ch
+    if 0 <= c < MCOLS and 0 <= r < MROWS:
+        i = _menu_page * PER_PAGE + r * MCOLS + c
+        if 0 <= i < len(ROSTER) and ctx.debounce(0.3):
+            name, key = ROSTER[i]
+            m = _load(key)
+            if m is not None:
+                _active = m
+                _active_name = name
+                _view = 'play'
+                if hasattr(m, 'on_enter'):
+                    try: m.on_enter(ctx)
+                    except Exception: pass
+                ctx.mark_dirty()
 
 
 # ---------- play ----------
