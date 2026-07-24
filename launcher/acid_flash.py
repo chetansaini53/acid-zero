@@ -142,11 +142,25 @@ def _mount(dev):
     return MNT if os.path.ismount(MNT) else None
 
 
+BOOTSEL_LABELS = ('RPI-RP2', 'RP2350', 'RPI-RP1')
+
+
+def _bootsel_dev():
+    """(dev, mnt) of a Pico BOOTSEL drive. RP2040 labels it 'RPI-RP2'; the RP2350
+    (Pico 2 / Pico 2 W) labels it 'RP2350' - both must be recognised."""
+    for lbl in BOOTSEL_LABELS:
+        dev, mnt = _find_label(lbl)
+        if dev:
+            return dev, mnt
+    return None, None
+
+
 def pico_scan():
-    """-> (state, detail). state in bootsel|circuitpy|none."""
-    if _find_label('RPI-RP2')[0]:
+    """-> (state, detail). state in bootsel|circuitpy|none. (Only the CIRCUITPY
+    label means CircuitPython - a bare /dev/ttyACM* could be the GPS/other CDC.)"""
+    if _bootsel_dev()[0]:
         return 'bootsel', 'BOOTSEL mode - ready for a full flash'
-    if _find_label('CIRCUITPY')[0] or glob.glob('/dev/ttyACM*'):
+    if _find_label('CIRCUITPY')[0]:
         return 'circuitpy', 'CircuitPython on board - code update ready'
     return 'none', 'hold BOOTSEL + plug the Pico in'
 
@@ -189,10 +203,10 @@ def pico_flash(ssid, psk, cb):
     if state == 'bootsel':
         if not os.path.exists(PICO_UF2):
             return False, 'CircuitPython .uf2 missing in firmware dir'
-        dev, mnt = _find_label('RPI-RP2')
+        dev, mnt = _bootsel_dev()
         mp = mnt or _mount(dev)
         if not mp:
-            return False, 'could not mount RPI-RP2'
+            return False, 'could not mount BOOTSEL drive'
         cb('flashing CircuitPython .uf2 ...')
         shutil.copy(PICO_UF2, os.path.join(mp, 'fw.uf2'))
         subprocess.run(['sync'], timeout=10)
