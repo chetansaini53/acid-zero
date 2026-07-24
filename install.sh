@@ -24,20 +24,28 @@ for d in launcher scripts apps lib/acid-ble systemd; do
 done
 ok "repo root: $REPO"
 
-# --- 1. display + touch overlay (idempotent, no duplicate lines) -------------
+# --- 1. display + touch overlay ----------------------------------------------
+# Append any MISSING lines under a FRESH [all] block. A bare EOF append is WRONG:
+# the stock jayofelony config.txt ends inside a per-model section ([pi5]), so lines
+# added there never apply on a Pi 3B+ and the TFT stays blank. A new [all] header
+# re-opens all-model scope regardless of the preceding section. Idempotent: a re-run
+# finds every line already present and appends nothing.
 CFG=/boot/firmware/config.txt
 [ -f "$CFG" ] || CFG=/boot/config.txt
 [ -f "$CFG" ] || { echo "config.txt not found in /boot/firmware/ or /boot/" >&2; exit 1; }
 log "Display overlay ($CFG)"
-cfg_add() {  # $1 = ERE key to test for, $2 = full line to append if absent
-  if grep -qE "$1" "$CFG"; then ok "present: $2"
-  else printf '%s\n' "$2" >> "$CFG"; ok "added:   $2"; fi
-}
-cfg_add '^[[:space:]]*dtparam=spi=on'     'dtparam=spi=on'
-cfg_add '^[[:space:]]*dtparam=i2c1=on'    'dtparam=i2c1=on'
-cfg_add '^[[:space:]]*dtparam=i2c_arm=on' 'dtparam=i2c_arm=on'
-cfg_add '^[[:space:]]*dtoverlay=spi0-2cs' 'dtoverlay=spi0-2cs'
-cfg_add '^[[:space:]]*dtoverlay=piscreen' 'dtoverlay=piscreen,speed=16000000,rotate=270'
+NEED_LINE=('dtparam=spi=on' 'dtparam=i2c1=on' 'dtparam=i2c_arm=on' 'dtoverlay=spi0-2cs' 'dtoverlay=piscreen,speed=16000000,rotate=270')
+NEED_KEY=('^[[:space:]]*dtparam=spi=on' '^[[:space:]]*dtparam=i2c1=on' '^[[:space:]]*dtparam=i2c_arm=on' '^[[:space:]]*dtoverlay=spi0-2cs' '^[[:space:]]*dtoverlay=piscreen')
+missing=()
+for i in "${!NEED_LINE[@]}"; do
+  if grep -qE "${NEED_KEY[$i]}" "$CFG"; then ok "present: ${NEED_LINE[$i]}"
+  else missing+=("${NEED_LINE[$i]}"); fi
+done
+if [ "${#missing[@]}" -gt 0 ]; then
+  { echo ''; echo '# >>> Acid Zero display (install.sh) >>>'; echo '[all]'
+    printf '%s\n' "${missing[@]}"; echo '# <<< Acid Zero display <<<'; } >> "$CFG"
+  for m in "${missing[@]}"; do ok "added:   $m  [all]"; done
+fi
 
 # --- 2. dependencies (apt) ---------------------------------------------------
 log "Dependencies (apt)"

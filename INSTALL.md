@@ -92,20 +92,26 @@ cd acid-zero          # every path below is relative to this repo root
 
 ## 3. Display + touch (device tree)
 
-Add to `/boot/firmware/config.txt`:
+> **`install.sh` (step 5) does this for you.** To do it by hand: the stock jayofelony
+> `config.txt` already enables SPI + I²C and loads `spi0-2cs` (under `[all]` / `[pi3]`),
+> so the only missing piece is the panel overlay. **Append it under a fresh `[all]`
+> block** at the end of `/boot/firmware/config.txt` — the stock file ends inside a
+> `[pi5]` section, and a bare append there would **not** load on a Pi 3B+:
 
 ```
-dtparam=spi=on
-dtparam=i2c1=on
-dtparam=i2c_arm=on
-dtoverlay=spi0-2cs
+[all]
 dtoverlay=piscreen,speed=16000000,rotate=270
 ```
+
+> If your image doesn't already have them, add `dtparam=spi=on`, `dtparam=i2c_arm=on`,
+> `dtparam=i2c1=on` and `dtoverlay=spi0-2cs` inside that same `[all]` block.
+> **`cmdline.txt` needs no change** — the service's `acid-console-off.sh` detaches the
+> framebuffer console at startup so the kernel console never fights the UI.
 
 This drives the ILI9486 panel on **SPI0** (framebuffer appears as `/dev/fb1`,
 480×320, RGB565) and the ADS7846 touch on the second chip-select. The launcher
 finds the framebuffer and the touch input device by **name**, not by number, so
-boot-order reshuffles don't break it. `sudo reboot` after editing `config.txt`.
+boot-order reshuffles don't break it. `sudo reboot` after the config change.
 
 > SPI0 is fully used by the display + touch. For a future **CC1101 sub-GHz** add-on
 > use **SPI1**; for a **PN532 NFC/RFID** add-on use the free **I2C-1** bus.
