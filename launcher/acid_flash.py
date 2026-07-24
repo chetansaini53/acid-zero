@@ -208,10 +208,15 @@ def pico_flash(ssid, psk, cb):
         if not mp:
             return False, 'could not mount BOOTSEL drive'
         cb('flashing CircuitPython .uf2 ...')
-        shutil.copy(PICO_UF2, os.path.join(mp, 'fw.uf2'))
-        subprocess.run(['sync'], timeout=10)
+        try:
+            # The RP2350 bootloader flashes blocks as they arrive and RESETS itself
+            # mid-write - so the copy is EXPECTED to error, and we must NOT sync (a
+            # sync to the vanished device hangs in uninterruptible I/O). Fire+forget.
+            shutil.copy(PICO_UF2, os.path.join(mp, 'fw.uf2'))
+        except OSError:
+            pass
         cb('CircuitPython flashed - waiting for reboot ...')
-        for _ in range(30):
+        for _ in range(40):
             time.sleep(1)
             if _find_label('CIRCUITPY')[0]:
                 break
