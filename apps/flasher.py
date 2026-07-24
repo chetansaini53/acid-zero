@@ -6,7 +6,7 @@
 # shared creds store, so the Bad USB app's CONNECT joins exactly what you flashed.
 # Educational / own-lab only.
 import os, sys, threading
-for _p in ('/usr/local/bin', '/usr/local/lib/acid-apps', '/home/ella3'):
+for _p in ('/usr/local/bin', '/usr/local/lib/acid-apps'):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 try:

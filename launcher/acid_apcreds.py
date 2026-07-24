@@ -12,7 +12,7 @@ it holds a WPA2 pre-shared key in plaintext, so it is never committed to the rep
 import json
 import os
 
-PATH = '/home/ella3/.acid_ap.json'
+PATH = '/home/pi/.acid_ap.json'
 DEFAULT_SSID = 'AcidZero-Duck'
 DEFAULT_PSK = 'acidzero1337'
 

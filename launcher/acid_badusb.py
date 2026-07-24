@@ -60,7 +60,7 @@ def _ap_iface() -> str:
 
 HOST = '192.168.4.1'               # the Pico AP gateway = the Pico itself
 PORT = 1337
-SCRIPTS_DIR = '/home/ella3/acid_badusb'    # drop Flipper .txt DuckyScripts here
+SCRIPTS_DIR = '/home/pi/acid_badusb'    # drop Flipper .txt DuckyScripts here
 
 
 def ap_creds() -> Tuple[str, str]:

@@ -4,7 +4,7 @@
 # its module exists, else shows SOON - so games are added one at a time.
 # Single-touch / resistive friendly. Educational fun; own device.
 import os, sys, importlib.util
-for _p in ('/usr/local/bin', '/usr/local/lib/acid-apps', '/home/ella3'):
+for _p in ('/usr/local/bin', '/usr/local/lib/acid-apps'):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 

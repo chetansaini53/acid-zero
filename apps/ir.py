@@ -13,7 +13,7 @@
 #
 # Educational / own-lab use only.
 import os, sys, threading
-for _p in ('/usr/local/bin', '/usr/local/lib/acid-apps', '/home/ella3'):
+for _p in ('/usr/local/bin', '/usr/local/lib/acid-apps'):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 try:
@@ -27,7 +27,7 @@ except Exception:
 
 META = {'name': 'IR Remote', 'icon': 'ir', 'color': (235, 140, 90)}
 
-SAVE_DIR = '/home/ella3/acid_ir_saved'
+SAVE_DIR = '/home/pi/acid_ir_saved'
 KB = ['1234567890', 'QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM']
 
 _ir = None

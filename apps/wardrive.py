@@ -11,7 +11,7 @@
 # until then the live console still shows every AP discovered (tagged SCAN
 # instead of LOG) so "is anything happening" is never a mystery.
 import os, sys, csv, io, glob, json, time, base64, threading, urllib.request
-for _p in ('/usr/local/bin', '/usr/local/lib/acid-apps', '/home/ella3'):
+for _p in ('/usr/local/bin', '/usr/local/lib/acid-apps'):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 try:
@@ -21,7 +21,7 @@ except Exception:
 
 META = {'name': 'Wardrive', 'icon': 'pin', 'color': (30, 200, 121)}
 
-LOG_DIR = '/home/ella3/acid_wardrive'
+LOG_DIR = '/home/pi/acid_wardrive'
 BC_URL = 'http://127.0.0.1:8081/api/session'
 BC_AUTH = 'Basic ' + base64.b64encode(b'pwnagotchi:pwnagotchi').decode()
 POLL_S = 5.0

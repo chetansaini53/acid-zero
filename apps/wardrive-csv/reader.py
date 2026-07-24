@@ -2,7 +2,7 @@
 # ACID native app - Wardrive CSV reader.  Educational / own-lab only.
 # A second native-plugin sample (alongside hello-native): a standalone program
 # that OWNS the ILI9486 framebuffer + ADS7846 touch, reads the WigleWifi CSV logs
-# the Wardrive app writes to /home/ella3/acid_wardrive/, and shows them in a
+# the Wardrive app writes to /home/pi/acid_wardrive/, and shows them in a
 # scrollable TABLE - fixed column header on top + UP/DOWN pagination, the same
 # look as the IR / Sub-GHz plugins. Tap EXIT to return to the launcher.
 #
@@ -17,7 +17,7 @@ except Exception:
     np = None
 
 W, H, BPP = 480, 320, 2
-CSV_DIR = '/home/ella3/acid_wardrive'
+CSV_DIR = '/home/pi/acid_wardrive'
 CAL_FILE = '/home/pi/acid_cal'
 
 # ---- palette (dark, theme-independent) ----

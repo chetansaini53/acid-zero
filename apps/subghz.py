@@ -6,7 +6,7 @@
 #   SAVED : browse saved signals -> replay (exact freq+mod+raw).
 # Educational / own-lab use only.
 import os, sys, glob, threading
-for _p in ('/usr/local/bin', '/usr/local/lib/acid-apps', '/home/ella3'):
+for _p in ('/usr/local/bin', '/usr/local/lib/acid-apps'):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 try:
@@ -22,7 +22,7 @@ except Exception:
 
 META = {'name': 'Sub-GHz', 'icon': 'radio', 'color': (175, 125, 235)}
 
-SAVE_DIR = '/home/ella3/acid_subghz_saved'
+SAVE_DIR = '/home/pi/acid_subghz_saved'
 PRESETS = [315.0, 433.92, 868.0, 915.0]
 KB = ['1234567890', 'QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM']
 HEXKB = ['0123456789', 'ABCDEF']
@@ -161,7 +161,7 @@ def _capture_store(ctx, label):
     frame = vals[:400]
     if frame:
         try:
-            with open('/home/ella3/acid_sub_frame.txt', 'w') as f:
+            with open('/home/pi/acid_sub_frame.txt', 'w') as f:
                 f.write(' '.join(map(str, frame)))
         except OSError:
             pass
@@ -337,7 +337,7 @@ def on_enter(ctx):
         global _frame, _pulses
         if not _frame:
             try:
-                f = [int(x) for x in open('/home/ella3/acid_sub_frame.txt').read().split() if x.lstrip('-').isdigit()]
+                f = [int(x) for x in open('/home/pi/acid_sub_frame.txt').read().split() if x.lstrip('-').isdigit()]
                 if f:
                     _frame = f; _pulses = len(f)
             except Exception:

@@ -4,14 +4,14 @@
 # DuckyScript payloads to the Pico at 192.168.4.1:1337. The Pi's main uplink
 # (wlan1) keeps SSH + internet the whole time. Self-contained - works anywhere.
 #
-# Payloads live in /home/ella3/acid_badusb/ and are browsed as nested FOLDERS,
+# Payloads live in /home/pi/acid_badusb/ and are browsed as nested FOLDERS,
 # one directory at a time (same lazy model as the IR app - a pasted-in payload
 # pack can be thousands of files deep, so only the open folder is ever scanned).
 #
 # Always-on AUTHORIZED-USE banner + an (i) educational Learn screen. Educational
 # / own-lab / authorized-device only. See ETHICS.md.
 import os, sys, threading
-for _p in ('/usr/local/bin', '/usr/local/lib/acid-apps', '/home/ella3'):
+for _p in ('/usr/local/bin', '/usr/local/lib/acid-apps'):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 try:
@@ -48,7 +48,7 @@ except Exception:
 
 META = {'name': 'Bad USB', 'icon': 'badusb', 'color': (210, 90, 90)}
 
-SCRIPTS_DIR = '/home/ella3/acid_badusb'    # drop Flipper .txt DuckyScripts (and folders) here
+SCRIPTS_DIR = '/home/pi/acid_badusb'    # drop Flipper .txt DuckyScripts (and folders) here
 
 _view = 'main'          # main | info | creds | kb
 _browse_rel = ''         # current folder, relative to SCRIPTS_DIR ('' = root)
@@ -270,7 +270,7 @@ def _draw_main(d, ctx):
     if not _browse_entries:
         ctx.ct(d, 240, 165, 'empty folder', ctx.F_NM, ctx.DIM)
         ctx.ct(d, 240, 186, 'drop Flipper .txt DuckyScripts (+ folders) into', ctx.F_SM, ctx.DIM)
-        ctx.ct(d, 240, 202, '/home/ella3/acid_badusb/', ctx.F_TINY, (150, 190, 240))
+        ctx.ct(d, 240, 202, '/home/pi/acid_badusb/', ctx.F_TINY, (150, 190, 240))
     else:
         page, total, start = _paged(len(_browse_entries), _browse_page, _PER_PAGE)
         y = LIST_TOP

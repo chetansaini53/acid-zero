@@ -25,14 +25,14 @@ using, UNLESS nothing else is present - Chetan's own rule: "ek hi external
 bacha to wahi share hoga" (radar/wardrive/badusb are used one at a time
 anyway, so sharing the SSH adapter as a last resort is fine, never blocking).
 
-Config: /home/ella3/.acid_wifi_roles.json  {"ssh": "rtl8821au", ...}
+Config: /home/pi/.acid_wifi_roles.json  {"ssh": "rtl8821au", ...}
 """
 import glob
 import json
 import os
 import subprocess
 
-CONF = '/home/ella3/.acid_wifi_roles.json'
+CONF = '/home/pi/.acid_wifi_roles.json'
 ROLES = ('ssh', 'monitor', 'badusb')
 ROLE_LABEL = {'ssh': 'SSH + Internet', 'monitor': 'Pwnagotchi / Radar / Wardrive', 'badusb': 'Bad USB (Pico link)'}
 ROLE_SHORT = {'ssh': 'SSH', 'monitor': 'MON', 'badusb': 'DUCK'}
