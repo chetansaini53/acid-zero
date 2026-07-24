@@ -299,9 +299,25 @@ Instrumented testing showed that an **iPhone personal hotspot (WPA3-SAE + 802.11
 
 ## Install
 
-Built on the jayofelony pwnagotchi base OS; paths assume the pwnagotchi default `/home/pi`.
+Built on the jayofelony pwnagotchi base OS. The launcher runs under the **system**
+`python3` (stdlib + Pillow + numpy) — no venv — so it's independent of how the
+pwnagotchi image lays out its own runtime.
 
-- **Runtime:** Python 3.11+, Pillow, numpy
+**Quick install (one command):**
+
+1. Flash a stock **jayofelony pwnagotchi** image (the **64-bit** asset, for the Pi 3B+)
+   and SSH in — full flashing walkthrough in **[INSTALL.md §1](INSTALL.md)**.
+2. On the Pi:
+   ```
+   git clone https://github.com/chetansaini53/acid-zero.git
+   cd acid-zero
+   sudo ./install.sh
+   ```
+   `install.sh` is idempotent — it sets the display overlay, installs the apt deps,
+   deploys every file, bundles the co-processor firmware, and enables the services.
+   Update later with `git pull && sudo ./install.sh`.
+
+- **Runtime:** system Python 3.11+, Pillow, numpy (+ pyserial for the co-processors)
 - **Wi-Fi:** bettercap (via pwnagotchi), aircrack-ng suite, hcxtools (`hcxpcapngtool`), hostapd, dnsmasq
 - **Bluetooth:** bluez (`btmgmt` / `btmon`), raw HCI sockets
 - **Display:** Linux `fbtft`

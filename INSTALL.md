@@ -207,10 +207,10 @@ The **Flasher** app flashes both co-processors straight from the handheld — SC
 (verify the right board) then FLASH. It ships the firmware it needs:
 
 ```
-# esptool for the ESP32 flash - install into the SYSTEM python so the root launcher
-# (which runs under /usr/bin/python3) can see it. A "pip install --user" in your login
-# account is NOT visible to it.
-sudo python3 -m pip install --break-system-packages esptool
+# esptool for the ESP32 flash. Debian trixie ships it in the signed apt repo:
+sudo apt install -y esptool
+# (fallback only if your image lacks the package - installs into the system python
+#  so the root launcher can see it:  sudo python3 -m pip install --break-system-packages esptool)
 
 # bundle the flashable firmware for the Flasher
 sudo mkdir -p /usr/local/share/acid-firmware/pico-badusb
