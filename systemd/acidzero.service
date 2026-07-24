@@ -5,7 +5,11 @@ After=pwnagotchi.service
 # Detach the kernel framebuffer console (fbcon) + disable blanking so the Linux
 # console / getty / cursor never draw over the UI (the app owns /dev/fb0 directly).
 ExecStartPre=/usr/local/bin/acid-console-off.sh
-ExecStart=/home/pi/.pwn/bin/python3 /usr/local/bin/acidzero.py
+# The launcher only needs stdlib + PIL + numpy (all from apt) - it never imports
+# pwnagotchi - so run it under the SYSTEM python3. Deliberate: this stays correct
+# no matter how the underlying pwnagotchi image lays out its own venv (older images
+# build /home/<user>/.pwn, released 2.9.x installs pwnagotchi system-wide).
+ExecStart=/usr/bin/python3 /usr/local/bin/acidzero.py
 Restart=always
 RestartSec=10
 [Install]
