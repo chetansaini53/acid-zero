@@ -51,27 +51,45 @@ boot loops and corruption.
 > ⚠️ **Never run `sudo apt-get upgrade` on this image** — it pins kernel/driver/bettercap
 > versions; upgrading forces a full reflash.
 
-### 1.4 SSH in
+### 1.4 First access — SSH over the USB gadget (edit the card FIRST)
 
-Default login is **`pi` / `raspberry`** (unchanged in the jayofelony fork; this is why
-you must *not* override it in Imager). Default hostname is `pwnagotchi`.
+> ⚠️ **This is the step a fresh flash won't boot into SSH without.** Once pwnagotchi
+> starts on a Pi 3B+ it pulls the **onboard Wi-Fi into monitor mode** (`wlan0mon`) for
+> capture — so there is **no Wi-Fi/LAN SSH** until you later add a *second* Wi-Fi adapter.
+> The only reliable first-boot access is the **USB Ethernet gadget** (`usb0`), and the
+> stock image needs it enabled. Do this **on the card, from Windows, before first boot** —
+> both files sit on the card's **boot (FAT) partition** (the `I:` drive), editable in
+> Notepad.
 
-- **Over USB (Pi 3B+):** connect the Pi's **USB data port** to the PC with a
-  **USB-A ↔ USB-A *data* cable** (not charge-only). On Windows, install the bundled
-  USB Ethernet/RNDIS gadget driver first (see the wiki's *Connecting* page — remove any
-  old RNDIS driver and reboot Windows), then:
-  ```
-  ssh pi@pwnagotchi.local
-  ```
-  Don't rely on a fixed gadget IP — it varies by host. If `pwnagotchi.local` doesn't
-  resolve, read the real address on the Pi (HDMI/keyboard or serial console) with
-  `ip addr show usb0` and SSH to that.
-- **Over your network:** put a second USB Wi-Fi adapter / Ethernet on the Pi, then
-  `ssh pi@pwnagotchi.local` from any machine on the same LAN.
+1. **`cmdline.txt`** — the missing piece. It is **one single line**; append
+   `modules-load=dwc2,g_ether` to the **end of that same line**, space-separated, and do
+   **not** introduce a newline:
+   ```
+   ... fsck.repair=yes rootwait modules-load=dwc2,g_ether
+   ```
+2. **`config.txt`** — needs `dtoverlay=dwc2`. The stock jayofelony image **already has it
+   under `[all]`**, so normally no change. If the gadget doesn't enumerate on the 3B+,
+   force device mode by making that line `dtoverlay=dwc2,dr_mode=peripheral`.
 
-Plugged into a computer the pwnagotchi is in **MANU** (manual) mode — sshd runs but it
-does **not** capture; on battery/power-only it runs the **AUTO** capture loop. SSH works
-in both.
+Then boot, and connect the Pi to the PC with a **USB-A ↔ USB-A *data* cable** (not
+charge-only) into a Pi USB port. Windows enumerates it as *"Raspberry Pi USB Remote NDIS
+Network Device"* (install the RNDIS driver if prompted). Log in:
+
+```
+ssh pi@pwnagotchi.local          # login  pi / raspberry
+```
+
+The Pi runs its own DHCP over the gadget and takes the subnet gateway IP (on our build
+`10.12.194.1` — it can differ). If `pwnagotchi.local` doesn't resolve, SSH to that gateway
+IP, or read the real one on the Pi with `ip addr show usb0`.
+
+> **Totally silent USB (no device at all in Windows)** = a **charge-only cable or the wrong
+> port**, not a config bug — swap to a known **data** cable first.
+
+Plugged into the computer the pwnagotchi is in **MANU** mode (sshd up, no capture); on
+battery/power-only it runs the **AUTO** capture loop. SSH works in both. Once Acid Zero is
+deployed with a **second Wi-Fi adapter** as the client uplink, you can SSH over your LAN and
+the USB cable is only for recovery.
 
 > The web UI is on by default at `http://pwnagotchi.local:8080` with creds
 > `changeme` / `changeme` — change them (`ui.web.username` / `ui.web.password` in the

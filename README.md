@@ -299,14 +299,26 @@ Instrumented testing showed that an **iPhone personal hotspot (WPA3-SAE + 802.11
 
 ## Install
 
-Built on the jayofelony pwnagotchi base OS. The launcher runs under the **system**
-`python3` (stdlib + Pillow + numpy) — no venv — so it's independent of how the
-pwnagotchi image lays out its own runtime.
+Built on the jayofelony pwnagotchi base OS. Two ways to get it onto a Pi 3B+:
 
-**Quick install (one command):**
+### Option A — flash the ready-made image (easiest)
+
+Download the latest **`acidzero-*.img.xz`** from the
+[Releases](https://github.com/chetansaini53/acid-zero/releases) page and flash it
+with Raspberry Pi Imager or balenaEtcher, then boot — no setup, no commands. It's a
+clean jayofelony pwnagotchi base with Acid Zero pre-deployed; the default login and
+first-boot notes are on the release page. Provenance, licensing and the GPL source
+offer are in **[CREDITS.md](CREDITS.md)**.
+
+### Option B — build it yourself (on a stock jayofelony pwnagotchi)
+
+Prefer to layer Acid Zero onto your own install, or audit every step? The launcher
+runs under the **system** `python3` (stdlib + Pillow + numpy — no venv), so it's
+independent of how the base image lays out its own runtime.
 
 1. Flash a stock **jayofelony pwnagotchi** image (the **64-bit** asset, for the Pi 3B+)
-   and SSH in — full flashing walkthrough in **[INSTALL.md §1](INSTALL.md)**.
+   and get SSH access — full walkthrough incl. the USB-gadget bootstrap in
+   **[INSTALL.md §1](INSTALL.md)**.
 2. On the Pi:
    ```
    git clone https://github.com/chetansaini53/acid-zero.git
@@ -315,7 +327,8 @@ pwnagotchi image lays out its own runtime.
    ```
    `install.sh` is idempotent — it sets the display overlay, installs the apt deps,
    deploys every file, bundles the co-processor firmware, and enables the services.
-   Update later with `git pull && sudo ./install.sh`.
+   Update later with `git pull && sudo ./install.sh`. This same script builds the
+   release image — see **[BUILD_CLEAN_IMAGE.md](BUILD_CLEAN_IMAGE.md)**.
 
 - **Runtime:** system Python 3.11+, Pillow, numpy (+ pyserial for the co-processors)
 - **Wi-Fi:** bettercap (via pwnagotchi), aircrack-ng suite, hcxtools (`hcxpcapngtool`), hostapd, dnsmasq
