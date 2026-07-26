@@ -1,0 +1,12 @@
+[Unit]
+Description=Acid Zero - Waveshare UPS HAT (D) monitor + safe shutdown
+After=local-fs.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/bin/acid-ups.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -524,10 +524,30 @@ def build_grid(page=0):
         rr(gd,box,fill=TILE,outline=LINE,w=1,r=10); cx=(box[0]+box[2])//2
         ic_scaled(gd,k,cx,cy0+22,col); ct(gd,cx,cy0+CH-15,nm[:9],F_TILE,FG)
     return gi
+_ups_cache=(0,False,False,0.0)   # (pct,charging,present,ts) - throttle the /run/acid_ups read to ~2s
+def ups():
+    global _ups_cache
+    if time.time()-_ups_cache[3]<2.0:
+        return _ups_cache[0],_ups_cache[1],_ups_cache[2]
+    pct,chg,present=0,False,False
+    try:
+        with open('/run/acid_ups') as _f: _j=json.load(_f)
+        pct=int(_j.get('pct',0)); chg=bool(_j.get('chg')); present=bool(_j.get('present'))
+    except Exception: pass
+    _ups_cache=(pct,chg,present,time.time())
+    return pct,chg,present
+
+
 def draw_home(d,mi):
     d.rectangle((0,0,W,26),fill=BARBG); d.line([(0,26),(W,26)],fill=LINE)
     x=lt(d,9,13,'ACID',F_TIT,ACC); x=lt(d,x+8,13,'// zero',F_SM,DIM)
     ct(d,240,13,time.strftime('%H:%M   %a %d %b'),F_SM,FG)   # clock centered; system stats moved to the panel
+    _bp,_bchg,_bpres=ups()                                   # UPS HAT (D) battery - top-right, phone-style
+    if _bpres:
+        _bc=(90,180,255) if _bchg else (60,200,110) if _bp>30 else (235,200,60) if _bp>15 else (235,80,80)
+        rr(d,(444,7,468,19),outline=DIM,w=1,r=2); d.rectangle((469,10,471,16),fill=DIM)
+        d.rectangle((446,9,446+int(20*_bp/100),17),fill=_bc)
+        ct(d,428,13,('%d%%'%_bp)+('+' if _bchg else ''),F_TINY,_bc)
     d.rectangle((0,27,W,93),fill=PANEL); d.line([(0,94),(W,94)],fill=LINE)
     rr(d,(6,31,128,90),fill=TILE,outline=LINE,w=1,r=8)
     if face_img is not None:

@@ -51,7 +51,7 @@ fi
 log "Dependencies (apt)"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq || warn "apt update failed — continuing with the local cache"
-apt-get install -y python3-pil python3-numpy python3-serial \
+apt-get install -y python3-pil python3-numpy python3-serial python3-smbus i2c-tools \
                    aircrack-ng hcxtools hostapd dnsmasq bluez
 ok "apt packages installed"
 # hostapd + dnsmasq install as always-on units (dnsmasq binds :53); Acid Zero's Evil
@@ -117,7 +117,8 @@ log "Enable services"
 systemctl daemon-reload
 systemctl enable --now acidzero.service
 systemctl enable --now acid-hs-clean.timer
-ok "acidzero.service + acid-hs-clean.timer enabled"
+systemctl enable --now acid-ups.service               # Waveshare UPS HAT (D) monitor + safe shutdown (harmless if no HAT)
+ok "acidzero.service + acid-hs-clean.timer + acid-ups.service enabled"
 
 # --- 6. verify ---------------------------------------------------------------
 log "Verify"
