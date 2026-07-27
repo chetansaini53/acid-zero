@@ -97,6 +97,8 @@ def ic(d,k,cx,cy,col):
         d.ellipse((cx-11,cy-11,cx+11,cy+11),outline=col,width=2); d.ellipse((cx-1,cy-6,cx+1,cy-4),fill=col); d.line((cx,cy-1,cx,cy+6),fill=col,width=2)
     elif k=='radar':
         d.arc((cx-12,cy-12,cx+12,cy+12),0,360,fill=col,width=2); d.arc((cx-6,cy-6,cx+6,cy+6),0,360,fill=col,width=1); d.line((cx,cy,cx+9,cy-9),fill=col,width=2); d.ellipse((cx+4,cy-8,cx+8,cy-4),fill=col)
+    elif k=='term':
+        rr(d,(cx-12,cy-9,cx+12,cy+9),outline=col,w=2,r=3); d.line((cx-7,cy-4,cx-3,cy),fill=col,width=2); d.line((cx-3,cy,cx-7,cy+4),fill=col,width=2); d.line((cx-1,cy+4,cx+7,cy+4),fill=col,width=2)
     else:
         rr(d,(cx-10,cy-10,cx+10,cy+10),outline=col,w=2,r=3)
 def ic_scaled(d,k,cx,cy,col,s=0.92):
@@ -104,7 +106,7 @@ def ic_scaled(d,k,cx,cy,col,s=0.92):
     ic(td,k,30,30,col); n=max(1,int(60*s)); t=t.resize((n,n),Image.LANCZOS)
     d._image.paste(t,(int(cx-n/2),int(cy-n/2)),t)
 APPS=[('WiFi','wifi',(25,200,121)),('Radar','radar',(70,180,235)),('Handshake','key',(230,180,40)),('Evil AP','router',(235,130,55)),('BLE Spam','bt',(30,200,230)),('BLE Scan','bt',(70,130,235)),('Sub-GHz','radio',(175,125,235)),('NFC/RFID','wave',(235,70,150)),('IR Remote','remote',(235,130,55)),('Bad USB','usb',(30,200,121)),('Pwnagotchi','ghost',(30,200,230)),('Packets','net',(225,180,40)),('Wardrive','pin',(30,200,121)),('Settings','gear',(140,155,180)),('About','info',(140,155,180))]
-COLS=5; ROWS=3; GX=5; GY=98; CW=(W-10)/COLS; CH=(H-GY-22)/ROWS
+COLS=5; ROWS=3; GX=5; GY=98; CW=(W-10)/COLS; CH=(H-GY-30)/ROWS   # -30 reserves the taller home footer
 CAL_TARGETS=[(44,46),(436,46),(436,274),(44,274)]
 def memp():
     try:
@@ -1484,9 +1486,9 @@ while True:
                     except Exception: pass
                     screen='home'
             elif screen=='home':
-                if ty>=H-20 and PAGES>1 and now-_last_act>0.3:
-                    if 175<=tx<=228 and home_page>0: _last_act=now; home_page-=1
-                    elif 258<=tx<=311 and home_page<PAGES-1: _last_act=now; home_page+=1
+                if ty>=H-30 and PAGES>1 and now-_last_act>0.3:
+                    if 152<=tx<=240 and home_page>0: _last_act=now; home_page-=1
+                    elif 264<=tx<=352 and home_page<PAGES-1: _last_act=now; home_page+=1
                 elif ty>=GY:
                     col=int((tx-GX)//CW); row=int((ty-GY)//CH); idx=home_page*PER+row*COLS+col
                     if 0<=col<COLS and 0<=row<ROWS and 0<=idx<len(GRID):
@@ -1756,17 +1758,19 @@ while True:
             # cover PREV/NEXT + UP/DOWN page bars and clip content). The calibration
             # toast stays transient on any screen.
             if screen=='home':
-                d.rectangle((0,H-18,W,H),fill=BARBG); d.line([(0,H-18),(W,H-18)],fill=LINE)
-                if cal_msg and now-cal_msg_t<6: ct(d,W//2,H-8,cal_msg,F_SM,ACC)
+                d.rectangle((0,H-30,W,H),fill=BARBG); d.line([(0,H-30),(W,H-30)],fill=LINE)
+                if cal_msg and now-cal_msg_t<6: ct(d,W//2,H-15,cal_msg,F_NM,ACC)
                 else:
-                    lt(d,10,H-9,'IP '+cur_ip+((' ['+ssh_iface+']') if ssh_iface not in ('','?') else ''),F_SM,(FG if cur_ip!='-' else DIM))
+                    lt(d,10,H-15,'IP '+cur_ip+((' ['+ssh_iface+']') if ssh_iface not in ('','?') else ''),F_SM,(FG if cur_ip!='-' else DIM))
                     if PAGES>1:
-                        ct(d,200,H-9,'< PREV',F_SM,(FG if home_page>0 else DIM))
-                        ct(d,240,H-9,'%d/%d'%(home_page+1,PAGES),F_SM,ACC)
-                        ct(d,283,H-9,'NEXT >',F_SM,(FG if home_page<PAGES-1 else DIM))
-                    elif active_radio: ct(d,W//2+20,H-9,('use: '+active_radio)[:24],F_SM,(235,180,40))
+                        rr(d,(160,H-24,232,H-6),fill=TILE,outline=(ACC if home_page>0 else LINE),w=1,r=7)
+                        ct(d,196,H-15,'< PREV',F_NM,(FG if home_page>0 else DIM))
+                        ct(d,252,H-15,'%d/%d'%(home_page+1,PAGES),F_SM,ACC)
+                        rr(d,(272,H-24,344,H-6),fill=TILE,outline=(ACC if home_page<PAGES-1 else LINE),w=1,r=7)
+                        ct(d,308,H-15,'NEXT >',F_NM,(FG if home_page<PAGES-1 else DIM))
+                    elif active_radio: ct(d,W//2+20,H-15,('use: '+active_radio)[:24],F_SM,(235,180,40))
                     nc=(25,200,121) if net_state else (235,80,80)
-                    d.ellipse((W-94,H-13,W-86,H-5),fill=nc); lt(d,W-80,H-9,'NET '+('ON' if net_state else 'OFF'),F_SM,DIM)
+                    d.ellipse((W-94,H-19,W-86,H-11),fill=nc); lt(d,W-80,H-15,'NET '+('ON' if net_state else 'OFF'),F_SM,DIM)
             elif cal_msg and now-cal_msg_t<6:
                 d.rectangle((0,H-18,W,H),fill=BARBG); d.line([(0,H-18),(W,H-18)],fill=LINE)
                 ct(d,W//2,H-8,cal_msg,F_SM,ACC)
