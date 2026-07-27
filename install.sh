@@ -52,12 +52,24 @@ log "Dependencies (apt)"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq || warn "apt update failed — continuing with the local cache"
 apt-get install -y python3-pil python3-numpy python3-serial python3-smbus i2c-tools \
+                   python3-dbus python3-gi \
                    aircrack-ng hcxtools hostapd dnsmasq bluez
 ok "apt packages installed"
 # hostapd + dnsmasq install as always-on units (dnsmasq binds :53); Acid Zero's Evil
 # Portal starts its own on demand, so stop the standing units to avoid a port/interface
 # clash — they stay installed, just not auto-running.
 systemctl disable --now dnsmasq hostapd 2>/dev/null || true
+# The BLE HID media-remote needs bluetoothd's experimental D-Bus API (LEAdvertisingManager
+# + secure HID characteristics). Enable it via a drop-in - harmless if you never use it.
+BTD="$(command -v bluetoothd || true)"; [ -x "$BTD" ] || BTD=/usr/libexec/bluetooth/bluetoothd
+[ -x "$BTD" ] || BTD=/usr/lib/bluetooth/bluetoothd
+if [ -x "$BTD" ] && ! pgrep -f 'bluetoothd.*--experimental' >/dev/null 2>&1; then
+  mkdir -p /etc/systemd/system/bluetooth.service.d
+  printf '[Service]\nExecStart=\nExecStart=%s --experimental\n' "$BTD" \
+    > /etc/systemd/system/bluetooth.service.d/acid-experimental.conf
+  systemctl daemon-reload; systemctl restart bluetooth 2>/dev/null || true
+  ok "bluetoothd --experimental enabled (for BLE HID remote)"
+fi
 if /usr/bin/python3 -c 'import PIL, numpy' 2>/dev/null; then
   ok "PIL + numpy import OK under /usr/bin/python3"
 else
@@ -118,7 +130,17 @@ systemctl daemon-reload
 systemctl enable --now acidzero.service
 systemctl enable --now acid-hs-clean.timer
 systemctl enable --now acid-ups.service               # Waveshare UPS HAT (D) monitor + safe shutdown (harmless if no HAT)
-ok "acidzero.service + acid-hs-clean.timer + acid-ups.service enabled"
+# LAN clipboard bridge for the Terminal app (paste a command from the laptop). Mint a
+# strong random token if none exists yet; the daemon also self-mints, this just lets
+# us print it now for the laptop-side sync script.
+if [ ! -s /etc/acid-clip.token ]; then
+  # umask 077 -> the secret is 0600 from creation (never world-readable, even briefly)
+  ( umask 077; /usr/bin/python3 -c "import os;open('/etc/acid-clip.token','w').write(os.urandom(18).hex())" )
+fi
+systemctl enable --now acid-clip.service
+ok "acidzero + acid-hs-clean + acid-ups + acid-clip services enabled"
+warn "clipboard token: read it yourself with  sudo cat /etc/acid-clip.token  then pass it to"
+warn "  tools/acid-clip-sync.ps1 on your laptop. Keep it private - never commit it."
 
 # --- 6. verify ---------------------------------------------------------------
 log "Verify"
