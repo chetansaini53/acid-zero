@@ -226,6 +226,8 @@ def _touch_remote(tx, ty, ctx):
 # HID Keyboard/Keypad usage codes. Modifier byte bits: Ctrl 1, Shift 2, Alt 4, Win 8.
 _MODS = [('CTRL', 0x01), ('SHIFT', 0x02), ('ALT', 0x04), ('WIN', 0x08)]
 _kmod = 0          # armed sticky-modifier byte; one-shot (clears after a key)
+_caps = False      # Caps Lock: persistent, auto-shifts a-z (no per-key Shift)
+_CAPS = 57         # HID usage 0x39 - also our Caps-toggle sentinel in _SPECIAL
 _kpage = 'abc'
 _PAGES = {
     'abc': [
@@ -245,14 +247,15 @@ _PAGES = {
     ],
 }
 _TABS = [('ABC', 'abc'), ('123', '123'), ('NUM', 'num')]
-_SPECIAL = [('Esc', 41), ('Tab', 43)]
+_SPECIAL = [('Esc', 41), ('Tab', 43), ('Caps', _CAPS)]   # Caps = local lock toggle (see _touch)
 _ARROWS = [('<', 80), ('v', 81), ('^', 82), ('>', 79)]
 
 
 def _kb_send(code):
     global _kmod
-    _send('k %d %d' % (_kmod, code))
-    _kmod = 0          # sticky modifiers are one-shot
+    mod = _kmod | (0x02 if _caps and 4 <= code <= 29 else 0)   # Caps Lock shifts letters a-z only
+    _send('k %d %d' % (mod, code))
+    _kmod = 0          # sticky modifiers are one-shot; Caps Lock persists until toggled off
 
 
 def _draw_keyboard(d, ctx):
@@ -261,43 +264,46 @@ def _draw_keyboard(d, ctx):
     d.ellipse((360, 9, 372, 21), fill=(60, 200, 110) if connected else (235, 180, 40))
     _btn(ctx, d, (386, 3, 472, 25), 'FOLDER', (45, 52, 68), ctx.ACC, ctx.F_SM)
     mx = 2
-    for label, bit in _MODS:                       # sticky modifier row
+    for label, bit in _MODS:                       # sticky modifier row (ty>=42 clears the home-zone)
         on = bool(_kmod & bit)
-        ctx.rr(d, (mx, 30, mx + 90, 55), fill=(30, 120, 210) if on else (46, 54, 70), r=6)
-        ctx.ct(d, mx + 45, 42, label, ctx.F_SM, (240, 248, 255) if on else ctx.FG); mx += 94
-    ctx.rr(d, (mx, 30, 478, 55), fill=(150, 45, 45), r=6); ctx.ct(d, (mx + 478) // 2, 42, 'C-A-DEL', ctx.F_SM, (255, 230, 230))
-    ys = [58, 96, 134]
+        ctx.rr(d, (mx, 42, mx + 90, 64), fill=(30, 120, 210) if on else (46, 54, 70), r=6)
+        ctx.ct(d, mx + 45, 53, label, ctx.F_SM, (240, 248, 255) if on else ctx.FG); mx += 94
+    ctx.rr(d, (mx, 42, 478, 64), fill=(150, 45, 45), r=6); ctx.ct(d, (mx + 478) // 2, 53, 'C-A-DEL', ctx.F_SM, (255, 230, 230))
+    ys = [68, 104, 140]
     for r, row in enumerate(_PAGES[_kpage]):        # 3 key rows of 10
         y = ys[r]
         for c, (label, code) in enumerate(row):
             x = 2 + c * 48
-            ctx.rr(d, (x, y, x + 44, y + 34), fill=ctx.TILE, outline=ctx.LINE, w=1, r=5)
-            ctx.ct(d, x + 22, y + 17, label, ctx.F_SM if len(label) <= 2 else ctx.F_TINY, ctx.FG)
-    tx = 2
+            disp = label.upper() if (_caps and len(label) == 1 and 'a' <= label <= 'z') else label
+            ctx.rr(d, (x, y, x + 44, y + 32), fill=ctx.TILE, outline=ctx.LINE, w=1, r=5)
+            ctx.ct(d, x + 22, y + 16, disp, ctx.F_SM if len(disp) <= 2 else ctx.F_TINY, ctx.FG)
+    bx = 2
     for label, pg in _TABS:                         # page tabs
         on = _kpage == pg
-        ctx.rr(d, (tx, 172, tx + 74, 204), fill=(30, 120, 210) if on else (46, 54, 70), r=6)
-        ctx.ct(d, tx + 37, 188, label, ctx.F_SM, (240, 248, 255) if on else ctx.FG); tx += 78
-    for label, code in _SPECIAL:                    # Esc, Tab
-        ctx.rr(d, (tx, 172, tx + 74, 204), fill=ctx.PANEL, outline=ctx.LINE, w=1, r=6)
-        ctx.ct(d, tx + 37, 188, label, ctx.F_SM, ctx.FG); tx += 78
-    ctx.rr(d, (2, 208, 120, 244), fill=ctx.PANEL, outline=ctx.LINE, w=1, r=6); ctx.ct(d, 61, 226, 'Bksp', ctx.F_SM, ctx.FG)
-    ctx.rr(d, (124, 208, 356, 244), fill=ctx.TILE, outline=ctx.LINE, w=1, r=6); ctx.ct(d, 240, 226, 'SPACE', ctx.F_SM, ctx.DIM)
-    ctx.rr(d, (360, 208, 478, 244), fill=(25, 150, 90), r=6); ctx.ct(d, 419, 226, 'Enter', ctx.F_SM, (240, 255, 246))
+        ctx.rr(d, (bx, 176, bx + 74, 206), fill=(30, 120, 210) if on else (46, 54, 70), r=6)
+        ctx.ct(d, bx + 37, 191, label, ctx.F_SM, (240, 248, 255) if on else ctx.FG); bx += 78
+    for label, code in _SPECIAL:                    # Esc, Tab, Caps(lock toggle)
+        capson = code == _CAPS and _caps
+        ctx.rr(d, (bx, 176, bx + 74, 206), fill=(30, 120, 210) if capson else ctx.PANEL,
+               outline=ctx.LINE, w=1, r=6)
+        ctx.ct(d, bx + 37, 191, label, ctx.F_SM, (240, 248, 255) if capson else ctx.FG); bx += 78
+    ctx.rr(d, (2, 210, 120, 242), fill=ctx.PANEL, outline=ctx.LINE, w=1, r=6); ctx.ct(d, 61, 226, 'Bksp', ctx.F_SM, ctx.FG)
+    ctx.rr(d, (124, 210, 356, 242), fill=ctx.TILE, outline=ctx.LINE, w=1, r=6); ctx.ct(d, 240, 226, 'SPACE', ctx.F_SM, ctx.DIM)
+    ctx.rr(d, (360, 210, 478, 242), fill=(25, 150, 90), r=6); ctx.ct(d, 419, 226, 'Enter', ctx.F_SM, (240, 255, 246))
     ax = 2
     for label, code in _ARROWS:                     # arrow cluster
-        ctx.rr(d, (ax, 248, ax + 116, 284), fill=ctx.TILE, outline=ctx.LINE, w=1, r=6)
-        ctx.ct(d, ax + 58, 266, label, ctx.F_BIG, ctx.ACC); ax += 119
-    ctx.ct(d, 240, 302, ('tap a modifier then a key  ·  keys go to the paired device'
+        ctx.rr(d, (ax, 246, ax + 116, 280), fill=ctx.TILE, outline=ctx.LINE, w=1, r=6)
+        ctx.ct(d, ax + 58, 263, label, ctx.F_BIG, ctx.ACC); ax += 119
+    ctx.ct(d, 240, 300, ('tap a modifier then a key  ·  keys go to the paired device'
                          if connected else 'not connected - pair from Bluetooth Remote first'),
            ctx.F_TINY, ctx.DIM if connected else (235, 120, 120))
 
 
 def _touch_keyboard(tx, ty, ctx):
-    global _view, _kmod, _kpage
+    global _view, _kmod, _kpage, _caps
     if ty <= 25 and tx >= 386 and ctx.debounce(0.3):
         _view = 'folder'; ctx.mark_dirty(); return
-    if 30 <= ty <= 55:                              # modifiers (tap centre; top sliver is the home-zone)
+    if 42 <= ty <= 64:                              # modifier row (fully below the home-zone)
         mx = 2
         for label, bit in _MODS:
             if mx <= tx <= mx + 90 and ctx.debounce(0.15):
@@ -306,15 +312,15 @@ def _touch_keyboard(tx, ty, ctx):
         if tx >= mx and ctx.debounce(0.3):
             _send('k 5 76'); ctx.mark_dirty(); return       # Ctrl+Alt+Del
         return
-    ys = [58, 96, 134]
+    ys = [68, 104, 140]
     for r, row in enumerate(_PAGES[_kpage]):
         y = ys[r]
-        if y <= ty <= y + 34:
+        if y <= ty <= y + 32:
             c = (tx - 2) // 48
             if 0 <= c < len(row) and ctx.debounce(0.1):
                 _kb_send(row[c][1]); ctx.mark_dirty()
             return
-    if 172 <= ty <= 204:
+    if 176 <= ty <= 206:
         cx = 2
         for label, pg in _TABS:
             if cx <= tx <= cx + 74 and ctx.debounce(0.2):
@@ -322,15 +328,19 @@ def _touch_keyboard(tx, ty, ctx):
             cx += 78
         for label, code in _SPECIAL:
             if cx <= tx <= cx + 74 and ctx.debounce(0.1):
-                _kb_send(code); ctx.mark_dirty(); return
+                if code == _CAPS:
+                    _caps = not _caps          # persistent Caps Lock, not a keystroke
+                else:
+                    _kb_send(code)
+                ctx.mark_dirty(); return
             cx += 78
         return
-    if 208 <= ty <= 244:
+    if 210 <= ty <= 242:
         if tx <= 120 and ctx.debounce(0.1): _kb_send(42)      # Bksp
         elif tx <= 356 and ctx.debounce(0.1): _kb_send(44)    # Space
         elif ctx.debounce(0.1): _kb_send(40)                  # Enter
         ctx.mark_dirty(); return
-    if 248 <= ty <= 284:
+    if 246 <= ty <= 280:
         ax = 2
         for label, code in _ARROWS:
             if ax <= tx <= ax + 116 and ctx.debounce(0.1):
