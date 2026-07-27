@@ -1,8 +1,23 @@
 # Acid Zero OS — Clean-Image Build & Data-Scrub Checklist
 
-Turn a working, personalized card into a SAFE, redistributable image. Run every
-step below on the Pi (over SSH or a keyboard) BEFORE you power off and image the
-card. Order matters: scrub first, set defaults, then image, shrink, compress.
+> ## ⚠️ WORK ON A COPY — NEVER YOUR DAILY DRIVER
+> This scrub is **destructive** (it wipes SSH keys, Wi-Fi creds, device identity,
+> history) and the rename changes the login user. **Do NOT run any of it on your
+> working device.** First **clone your working card to a spare**, boot the *spare*,
+> and do everything here on the spare. Your production card stays untouched.
+>
+> **Clone first (on your PC — Pi powered off, working card in a reader):**
+> ```
+> # Linux/WSL — sdX is the CARD (whole disk). Windows: use Win32DiskImager to Read.
+> sudo dd if=/dev/sdX of=acidzero-master.img bs=4M status=progress
+> ```
+> Flash `acidzero-master.img` to a **SPARE** card (Raspberry Pi Imager → Use custom),
+> boot the SPARE in the Pi, set the working card aside, and do every step below on the
+> SPARE only.
+
+Turn the SPARE (a clone of your working card) into a SAFE, redistributable image.
+Run every step below on the SPARE (over SSH or a keyboard) BEFORE you power it off
+and image it. Order matters: scrub first, set defaults, then image, shrink, compress.
 
 > **RULE:** This pass removes PRIVATE artifacts only. NEVER delete any LICENSE /
 > copyright / `/usr/share/doc/*/copyright` / `/usr/share/common-licenses/*` file —
