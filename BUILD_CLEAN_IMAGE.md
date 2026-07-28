@@ -78,6 +78,7 @@ rm -f /var/lib/dhcpcd/*.lease /var/lib/dhcp/*.leases 2>/dev/null
 ```
 rm -f /home/*/.acid_ap.json /root/.acid_ap.json           # shared Pico AP creds
 rm -f /home/*/.acid_wifi_roles.json 2>/dev/null
+rm -f /etc/acid-totp.json /etc/.acidtotp* 2>/dev/null      # TOTP 2FA seeds (authenticator app)
 rm -f /root/.git-credentials /home/*/.git-credentials 2>/dev/null
 rm -rf /root/.config/gh /home/*/.config/gh 2>/dev/null     # gh auth
 find / -xdev \( -iname '.env' -o -iname '*token*' -o -iname '*secret*' \) 2>/dev/null  # review each
@@ -158,6 +159,7 @@ ls /etc/ssh/ssh_host_* 2>/dev/null
 ls /etc/NetworkManager/system-connections/ 2>/dev/null
 cat /etc/wpa_supplicant/wpa_supplicant.conf 2>/dev/null
 ls /etc/pwnagotchi/*.pem 2>/dev/null
+ls /etc/acid-totp.json /etc/.acidtotp* 2>/dev/null         # TOTP 2FA seeds - must be gone
 find / -xdev -name '*.pcap*' 2>/dev/null
 
 # Confirm license files are STILL present (must NOT be removed)
