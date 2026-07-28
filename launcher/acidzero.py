@@ -402,7 +402,7 @@ def net_bg_thread():
 def wifi_bg_thread():
     global wifi_list,wifi_focus,wifi_off,dirty
     while True:
-        if screen in ('WiFi','WiFiClients','Handshake','Radar:nearby','Radar:eviltwin','Radar:all'):
+        if screen in ('WiFi','WiFiClients','Handshake','Radar:nearby','Radar:eviltwin','Radar:all','Radar:aphygiene'):
             wl=wifi_aps()
             if wl is not None:
                 wifi_list=wl; wifi_off=min(wifi_off,max(0,len(wl)-6))
@@ -474,6 +474,10 @@ LEARN['Radar:blespam']={'how':['Passively watches BLE advertising for a flood of
          'defend':['Keep phone OS updated (popup rate-limits).','Turn BLE off in crowded/untrusted areas.','Real devices = few MACs; spam = many new MACs fast.']}
 LEARN['Radar:deauth']={'how':['Passively sniffs 802.11 deauth/disassoc frames on','the monitor radio (hops 2.4+5GHz). A flood = many','such frames forcing clients off-net. Counts + alerts;','never transmits. Shows attacked AP + target clients.'],
          'defend':['WPA3-SAE + 802.11w PMF -> deauth cryptographically','ignored. On WPA2 it works, so treat sudden mass','disconnects as an attack signal. Prefer 5GHz / wired.']}
+LEARN['Radar:aphygiene']={'how':['Grades every nearby AP from the passive scan: OPEN','(no encryption), WEP and WPA1 are trivially broken.','No probing or joining - it only reads what APs already','broadcast. This is attacker-eye AP hygiene.'],
+         'defend':['Never join OPEN WiFi without a VPN - traffic is','sniffable and MITM-able. Kill WEP/WPA1 on your own','gear; move to WPA2-AES or WPA3. Encryption, not a','hidden SSID, is what actually protects the link.']}
+LEARN['Radar:trackers']={'how':['Filters the passive BLE scan for tracker signatures:','Apple Find My / AirTag (adv type 0x12), Tile, Samsung','SmartTag, and Tag/Keyring appearances - reading','advertisements already in the air. No second scan.'],
+         'defend':['If an unknown tracker follows you across places,','check your bag / car / clothing. Use the built-in','"unknown tracker" scan on your phone too. Tags ROTATE','MAC ~15min - passive shows presence, not "stalker".']}
 LEARN['BLE Inspect']={'how':['Connects to a BLE device as a GATT client and','enumerates its services + characteristics (and a','few readable values: name, battery, maker).','Active - it makes a real connection, unlike Scan.'],
          'defend':['Require pairing/bonding + encryption on sensitive','characteristics (LE Secure Connections).','Don\'t leave device-info/credentials world-readable.','Use resolvable-private addresses + whitelists.']}
 LEARN['Wardrive']={'how':['Reads bettercap\'s existing AP scan (same feed','WiFi Hunter uses - no second scanner spawned)','and tags each sighting with GPS coordinates.','Read-only: it never transmits, cracks, or joins.'],
@@ -662,19 +666,29 @@ def hwref_open():
     global hwref_page,screen
     hwref_page=0; screen='hwref'
     if hwref_blocks is None: threading.Thread(target=hwref_load,daemon=True).start()
-RADAR_SUBS=[('All Watch','all','active'),('Nearby Devices','nearby','active'),('Deauth Detector','deauth','active'),('BLE Spam Detector','blespam','active'),('Flipper Detector','flipper','active'),('Evil-Twin Detector','eviltwin','active')]
-RADAR_DESC={'all':'every detector at once','nearby':'WiFi + BLE devices around you','deauth':'deauth/disassoc flood (2.4+5G)','blespam':'BLE advertising spam flood','flipper':'Flipper Zero presence + BLE spam','eviltwin':'rogue AP / evil twin'}
+RADAR_SUBS=[('All Watch','all','active'),('Nearby Devices','nearby','active'),('Deauth Detector','deauth','active'),('BLE Spam Detector','blespam','active'),('Flipper Detector','flipper','active'),('Evil-Twin Detector','eviltwin','active'),('AP Hygiene','aphygiene','active'),('Tracker Detector','trackers','active')]
+RADAR_DESC={'all':'every detector at once','nearby':'WiFi + BLE devices around you','deauth':'deauth/disassoc flood (2.4+5G)','blespam':'BLE advertising spam flood','flipper':'Flipper Zero presence + BLE spam','eviltwin':'rogue AP / evil twin','aphygiene':'open / WEP / WPA1 weak APs','trackers':'AirTag / Find My / BLE tags'}
+RADAR_PER=6
 RADAR_CW=(W-16)//2; RADAR_Y0=54; RADAR_CH=80
 def draw_radar(d):
+    global radar_menu_page
     topbar(d,'RADAR')
     ct(d,W//2,40,'defensive detection  -  alert mode, no attack',F_SM,DIM)
-    for i,(name,key,stt) in enumerate(RADAR_SUBS):
+    total=max(1,(len(RADAR_SUBS)+RADAR_PER-1)//RADAR_PER)
+    radar_menu_page=min(max(radar_menu_page,0),total-1)
+    start=radar_menu_page*RADAR_PER
+    for i,(name,key,stt) in enumerate(RADAR_SUBS[start:start+RADAR_PER]):
         c=i%2; r=i//2; bx=8+c*RADAR_CW; by=RADAR_Y0+r*RADAR_CH; cx=bx+RADAR_CW//2
         act=(stt=='active')
         rr(d,(bx+4,by+4,bx+RADAR_CW-4,by+RADAR_CH-6),fill=TILE,outline=(ACC if act else LINE),w=(2 if act else 1),r=10)
         ct(d,cx,by+22,name,F_NM,(FG if act else DIM))
         ct(d,cx,by+42,RADAR_DESC.get(key,'')[:32],F_TINY,DIM)
         ct(d,cx,by+62,'OPEN' if act else 'SOON',F_SM,(ACC if act else (120,130,150)))
+    if total>1:
+        by=H-22
+        rr(d,(10,by,120,by+20),fill=TILE,outline=LINE,w=1,r=6); ct(d,65,by+10,'< PREV',F_SM,FG if radar_menu_page>0 else DIM)
+        ct(d,240,by+10,'%d / %d'%(radar_menu_page+1,total),F_SM,FG)
+        rr(d,(360,by,470,by+20),fill=TILE,outline=LINE,w=1,r=6); ct(d,415,by+10,'NEXT >',F_SM,FG if radar_menu_page<total-1 else DIM)
 RADAR_CX,RADAR_CY,RADAR_R=120,182,92
 def draw_radar_nearby(d):
     global radar_sweep,radar_img,radar_img_t,radar_img_theme
@@ -882,6 +896,54 @@ def draw_radar_eviltwin(d):
     if not suspects and not dups:
         lt(d,26,150,('analyzing %d APs...'%len(aps)) if not aps else 'all APs have a unique SSID/BSSID pairing',F_SM,DIM)
     lt(d,16,H-30,'enc-mismatch = real risk; duplicate SSID alone is often legit',F_TINY,DIM)
+def draw_radar_aphygiene(d):
+    # passive AP-hygiene grade over the existing bettercap scan (wifi_list) - reads only, no new scan
+    topbar(d,'AP HYGIENE')
+    aps=wifi_list or []
+    graded=[]
+    for ap in aps:
+        e=(ap[3] or '').upper()
+        if e in ('','?') or 'OPEN' in e: graded.append((ap,'OPEN',(235,90,90)))
+        elif 'WEP' in e: graded.append((ap,'WEP',(235,120,90)))
+        elif 'WPA3' in e or 'WPA2' in e: continue
+        elif 'WPA' in e: graded.append((ap,'WPA1',(235,180,70)))
+    if graded:
+        rr(d,(10,34,W-10,74),fill=(120,20,20),outline=(235,80,80),w=2,r=8)
+        ct(d,W//2,48,'%d WEAK / OPEN AP(s)'%len(graded),F_NM,(255,190,190))
+        ct(d,W//2,64,'passive check - avoid joining these networks',F_SM,(255,215,215))
+    else:
+        rr(d,(10,34,W-10,74),fill=PANEL,outline=ACC,w=1,r=8)
+        ct(d,W//2,48,'ALL %d AP(s) OK'%len(aps),F_NM,ACC)
+        ct(d,W//2,64,'no open / WEP / WPA1 nearby',F_SM,DIM)
+    y=90
+    for ap,tag,col in graded[:9]:
+        lt(d,20,y,str(ap[0])[:20],F_SM,FG); lt(d,238,y,tag,F_SM,col)
+        lt(d,300,y,'ch%s'%ap[1],F_TINY,DIM); lt(d,356,y,'%sdBm'%ap[2],F_TINY,DIM); y+=18
+    if not aps: ct(d,W//2,150,'scanning APs...  (open WiFi or Nearby first)',F_SM,DIM)
+    lt(d,16,H-28,'open=eavesdrop/MITM    WEP/WPA1=trivially cracked',F_TINY,DIM)
+_TRACKER_KEYS=(('find my','AirTag / Find My'),('airtag','AirTag'),('tile','Tile'),('smarttag','Samsung SmartTag'),('[tag]','BLE Tag'),('[keyring]','Keyring'))
+def draw_radar_trackers(d):
+    # filter tracker signatures out of the EXISTING BLE scan (ble_devices) - no second BLE burst
+    topbar(d,'TRACKER DETECTOR')
+    devs=ble_devices(60)
+    hits=[]
+    for mac,rssi,atype,lbl in devs:
+        low=(lbl or '').lower()
+        for k,name in _TRACKER_KEYS:
+            if k in low: hits.append((name,mac,rssi)); break
+    if hits:
+        rr(d,(10,34,W-10,74),fill=(120,60,10),outline=(235,180,40),w=2,r=8)
+        ct(d,W//2,48,'%d TRACKER BEACON(s) NEARBY'%len(hits),F_NM,(255,225,180))
+        ct(d,W//2,64,'unknown one? check your bag / car / jacket',F_SM,(255,230,200))
+    else:
+        rr(d,(10,34,W-10,74),fill=PANEL,outline=ACC,w=1,r=8)
+        ct(d,W//2,48,'NO TRACKERS  -  %d BLE seen'%len(devs),F_NM,ACC)
+        ct(d,W//2,64,'scanning...' if ble_scanning() else 'no AirTag/Tile/SmartTag signature',F_SM,DIM)
+    y=90
+    for name,mac,rssi in hits[:8]:
+        lt(d,20,y,name[:18],F_SM,(255,210,120)); lt(d,210,y,mac,F_TINY,DIM); lt(d,392,y,'%sdBm'%rssi,F_TINY,FG); y+=20
+    lt(d,16,H-42,'honest: AirTag/SmartTag rotate MAC ~15min. Passive = "a',F_TINY,DIM)
+    lt(d,16,H-28,'tracker is near", NOT "the same tag is following you".',F_TINY,DIM)
 def radar_flipper_start():
     try: os.remove('/tmp/acid_radar_flipper_stop')
     except Exception: pass
@@ -1438,7 +1500,7 @@ ep_ssid='Free WiFi'; ep_tpl='wifi'; ep_ch=6; ep_att=1; ep_pass=False; ep_run=Fal
 hs_off=0; hs_status=''; hs_status_t=0.0; hs_run=False
 ble_status=''; ble_status_t=0.0; ble_spam_run=False; ble_mode='sink'
 ble_insp_mac=''; insp_off=0; ble_page=0; learn_off=0
-radar_sweep=0.0; radar_ble_t=0.0; radar_img=None; radar_img_t=0.0; radar_img_theme=None
+radar_sweep=0.0; radar_ble_t=0.0; radar_img=None; radar_img_t=0.0; radar_img_theme=None; radar_menu_page=0
 ssh_iface='?'; mon_iface='?'; active_radio=''; radio_rows=[]
 svc_t=0.0; sys_confirm=''; sys_confirm_t=0.0
 if not os.path.exists(CONSENT_FLAG): screen='consent'   # first-run authorization gate
@@ -1665,11 +1727,15 @@ while True:
                         if tx<=90: insp_off=max(0,insp_off-8)
                         elif tx>=W-90: insp_off+=8
                 elif screen=='Radar':
-                    if ty>=54 and now-_last_act>0.3:
-                        _c=int((tx-8)//RADAR_CW); _r=int((ty-54)//RADAR_CH); _ri=_r*2+_c
+                    _rtot=(len(RADAR_SUBS)+RADAR_PER-1)//RADAR_PER
+                    if _rtot>1 and ty>=H-22 and now-_last_act>0.25:
+                        if tx<=120 and radar_menu_page>0: _last_act=now; radar_menu_page-=1
+                        elif tx>=360 and radar_menu_page<_rtot-1: _last_act=now; radar_menu_page+=1
+                    elif 54<=ty<294 and now-_last_act>0.3:
+                        _c=int((tx-8)//RADAR_CW); _r=int((ty-54)//RADAR_CH); _ri=radar_menu_page*RADAR_PER+_r*2+_c
                         if 0<=_c<2 and 0<=_ri<len(RADAR_SUBS) and RADAR_SUBS[_ri][2]=='active':
                             _last_act=now; _rk=RADAR_SUBS[_ri][1]; screen='Radar:'+_rk
-                            if _rk=='nearby': ble_scan_start(); radar_ble_t=now
+                            if _rk in ('nearby','trackers'): ble_scan_start(); radar_ble_t=now
                             elif _rk=='deauth': radar_deauth_start()
                             elif _rk=='blespam': radar_blespam_start()
                             elif _rk=='flipper': radar_flipper_start()
@@ -1716,6 +1782,10 @@ while True:
         if screen=='Radar:flipper' and now-last_draw>=0.4: dirty=True
         if screen=='Radar:eviltwin' and now-last_draw>=1.0: dirty=True
         if screen=='Radar:all' and now-last_draw>=0.5: dirty=True
+        if screen=='Radar:aphygiene' and now-last_draw>=1.0: dirty=True
+        if screen=='Radar:trackers':
+            if now-last_draw>=0.5: dirty=True
+            if not ble_scanning() and now-radar_ble_t>12: ble_scan_start(); radar_ble_t=now
         if screen=='calibrate' or (cal_msg and now-cal_msg_t<6) or (wifi_status and now-wifi_status_t<5): dirty=True
         if screen=='WiFiRoles' and ((roles_confirm and now-roles_confirm_t<4.2) or (roles_status and now-roles_status_t<6)): dirty=True
         if dirty or now-last_draw>=REFRESH:
@@ -1734,6 +1804,8 @@ while True:
             elif screen=='Radar:blespam': draw_radar_blespam(d)
             elif screen=='Radar:flipper': draw_radar_flipper(d)
             elif screen=='Radar:eviltwin': draw_radar_eviltwin(d)
+            elif screen=='Radar:aphygiene': draw_radar_aphygiene(d)
+            elif screen=='Radar:trackers': draw_radar_trackers(d)
             elif screen=='HWInfo': draw_hwinfo(d)
             elif screen=='Settings': draw_settings(d)
             elif screen=='WiFiStatus': draw_wifistatus(d)
