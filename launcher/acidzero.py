@@ -402,7 +402,7 @@ def net_bg_thread():
 def wifi_bg_thread():
     global wifi_list,wifi_focus,wifi_off,dirty
     while True:
-        if screen in ('WiFi','WiFiClients','Handshake','Radar:nearby','Radar:eviltwin','Radar:all','Radar:aphygiene'):
+        if screen in ('WiFi','WiFiClients','Handshake','Radar:nearby','Radar:eviltwin','Radar:all','Radar:aphygiene','Radar:audit'):
             wl=wifi_aps()
             if wl is not None:
                 wifi_list=wl; wifi_off=min(wifi_off,max(0,len(wl)-6))
@@ -478,6 +478,8 @@ LEARN['Radar:aphygiene']={'how':['Grades every nearby AP from the passive scan: 
          'defend':['Never join OPEN WiFi without a VPN - traffic is','sniffable and MITM-able. Kill WEP/WPA1 on your own','gear; move to WPA2-AES or WPA3. Encryption, not a','hidden SSID, is what actually protects the link.']}
 LEARN['Radar:trackers']={'how':['Filters the passive BLE scan for tracker signatures:','Apple Find My / AirTag (adv type 0x12), Tile, Samsung','SmartTag, and Tag/Keyring appearances - reading','advertisements already in the air. No second scan.'],
          'defend':['If an unknown tracker follows you across places,','check your bag / car / clothing. Use the built-in','"unknown tracker" scan on your phone too. Tags ROTATE','MAC ~15min - passive shows presence, not "stalker".']}
+LEARN['Radar:audit']={'how':['Aggregates the passive WiFi + BLE scans into one','self-contained HTML report: graded APs (open/WEP/','WPA1), evil-twin/duplicate SSIDs, BLE trackers, plus','a hardening checklist. Every scanned field is escaped.'],
+         'defend':['Turns a scan into a shareable deliverable - what an','attacker sees + how to fix it. Pull via the laptop','clipboard bridge or scp /tmp/acid_audit.html, then','open in a browser (print to PDF if you like).']}
 LEARN['BLE Inspect']={'how':['Connects to a BLE device as a GATT client and','enumerates its services + characteristics (and a','few readable values: name, battery, maker).','Active - it makes a real connection, unlike Scan.'],
          'defend':['Require pairing/bonding + encryption on sensitive','characteristics (LE Secure Connections).','Don\'t leave device-info/credentials world-readable.','Use resolvable-private addresses + whitelists.']}
 LEARN['Wardrive']={'how':['Reads bettercap\'s existing AP scan (same feed','WiFi Hunter uses - no second scanner spawned)','and tags each sighting with GPS coordinates.','Read-only: it never transmits, cracks, or joins.'],
@@ -666,8 +668,8 @@ def hwref_open():
     global hwref_page,screen
     hwref_page=0; screen='hwref'
     if hwref_blocks is None: threading.Thread(target=hwref_load,daemon=True).start()
-RADAR_SUBS=[('All Watch','all','active'),('Nearby Devices','nearby','active'),('Deauth Detector','deauth','active'),('BLE Spam Detector','blespam','active'),('Flipper Detector','flipper','active'),('Evil-Twin Detector','eviltwin','active'),('AP Hygiene','aphygiene','active'),('Tracker Detector','trackers','active')]
-RADAR_DESC={'all':'every detector at once','nearby':'WiFi + BLE devices around you','deauth':'deauth/disassoc flood (2.4+5G)','blespam':'BLE advertising spam flood','flipper':'Flipper Zero presence + BLE spam','eviltwin':'rogue AP / evil twin','aphygiene':'open / WEP / WPA1 weak APs','trackers':'AirTag / Find My / BLE tags'}
+RADAR_SUBS=[('All Watch','all','active'),('Nearby Devices','nearby','active'),('Deauth Detector','deauth','active'),('BLE Spam Detector','blespam','active'),('Flipper Detector','flipper','active'),('Evil-Twin Detector','eviltwin','active'),('AP Hygiene','aphygiene','active'),('Tracker Detector','trackers','active'),('Audit Report','audit','active')]
+RADAR_DESC={'all':'every detector at once','nearby':'WiFi + BLE devices around you','deauth':'deauth/disassoc flood (2.4+5G)','blespam':'BLE advertising spam flood','flipper':'Flipper Zero presence + BLE spam','eviltwin':'rogue AP / evil twin','aphygiene':'open / WEP / WPA1 weak APs','trackers':'AirTag / Find My / BLE tags','audit':'export findings -> HTML report'}
 RADAR_PER=6
 RADAR_CW=(W-16)//2; RADAR_Y0=54; RADAR_CH=80
 def draw_radar(d):
@@ -944,6 +946,35 @@ def draw_radar_trackers(d):
         lt(d,20,y,name[:18],F_SM,(255,210,120)); lt(d,210,y,mac,F_TINY,DIM); lt(d,392,y,'%sdBm'%rssi,F_TINY,FG); y+=20
     lt(d,16,H-42,'honest: AirTag/SmartTag rotate MAC ~15min. Passive = "a',F_TINY,DIM)
     lt(d,16,H-28,'tracker is near", NOT "the same tag is following you".',F_TINY,DIM)
+def _aphyg_weak(enc):
+    e=(enc or '').upper()
+    if e in ('','?') or 'OPEN' in e: return 'OPEN'
+    if 'WEP' in e: return 'WEP'
+    if 'WPA3' in e or 'WPA2' in e: return None
+    if 'WPA' in e: return 'WPA1'
+    return None
+def draw_radar_audit(d):
+    # aggregates the existing WiFi + BLE scans into a summary; GENERATE spawns acid-report.py
+    topbar(d,'AUDIT REPORT')
+    aps=wifi_list or []
+    weak=sum(1 for ap in aps if _aphyg_weak(ap[3]))
+    grp={}
+    for ap in aps:
+        s=ap[0]
+        if s and s!='<hidden>': grp.setdefault(s,set()).add(ap[5])
+    twins=sum(1 for s,b in grp.items() if len(b)>=2)
+    devs=ble_devices(60)
+    trk=sum(1 for m,r,a,l in devs if any(k in (l or '').lower() for k,_n in _TRACKER_KEYS))
+    rr(d,(10,34,W-10,116),fill=PANEL,outline=LINE,w=1,r=8)
+    ct(d,W//2,48,'SCAN SUMMARY',F_SM,DIM)
+    for i,(lab,n,warn) in enumerate([('APs',len(aps),False),('weak',weak,True),('twins',twins,True),('BLE',len(devs),False),('track',trk,True)]):
+        x=53+i*93; ct(d,x,80,str(n),F_TIT,(235,120,90) if (warn and n) else FG); ct(d,x,100,lab,F_TINY,DIM)
+    rr(d,(60,130,W-60,178),fill=(30,110,70),r=10); ct(d,W//2,154,'GENERATE  HTML  REPORT',F_NM,(230,255,236))
+    try: st=open('/tmp/acid_report_status').read().strip()
+    except Exception: st=''
+    ct(d,W//2,198,st[:56] if st else 'tap to build a shareable audit of nearby RF',F_SM,ACC if st else DIM)
+    ct(d,W//2,H-40,'-> laptop clipboard bridge (run acid-clip-sync.ps1), paste to',F_TINY,DIM)
+    ct(d,W//2,H-26,'a .html + open in a browser   ·   or scp /tmp/acid_audit.html',F_TINY,DIM)
 def radar_flipper_start():
     try: os.remove('/tmp/acid_radar_flipper_stop')
     except Exception: pass
@@ -1735,11 +1766,18 @@ while True:
                         _c=int((tx-8)//RADAR_CW); _r=int((ty-54)//RADAR_CH); _ri=radar_menu_page*RADAR_PER+_r*2+_c
                         if 0<=_c<2 and 0<=_ri<len(RADAR_SUBS) and RADAR_SUBS[_ri][2]=='active':
                             _last_act=now; _rk=RADAR_SUBS[_ri][1]; screen='Radar:'+_rk
-                            if _rk in ('nearby','trackers'): ble_scan_start(); radar_ble_t=now
+                            if _rk in ('nearby','trackers','audit'): ble_scan_start(); radar_ble_t=now
                             elif _rk=='deauth': radar_deauth_start()
                             elif _rk=='blespam': radar_blespam_start()
                             elif _rk=='flipper': radar_flipper_start()
                             elif _rk=='all': radar_all_start()
+                elif screen=='Radar:audit':
+                    if 130<=ty<=178 and 60<=tx<=W-60 and now-_last_act>0.5:
+                        _last_act=now
+                        try: subprocess.Popen(['setsid','python3','/usr/local/bin/acid-report.py'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,stdin=subprocess.DEVNULL)
+                        except Exception: pass
+                        try: open('/tmp/acid_report_status','w').write('generating...')
+                        except Exception: pass
                 elif screen=='BLE Spam':
                     if 38<=ty<=72 and not ble_spam_running() and now-_last_act>0.3:
                         _last_act=now; ble_mode=BLE_MODES[(BLE_MODES.index(ble_mode)+1)%len(BLE_MODES)] if ble_mode in BLE_MODES else 'sink'
@@ -1786,6 +1824,9 @@ while True:
         if screen=='Radar:trackers':
             if now-last_draw>=0.5: dirty=True
             if not ble_scanning() and now-radar_ble_t>12: ble_scan_start(); radar_ble_t=now
+        if screen=='Radar:audit':
+            if now-last_draw>=0.7: dirty=True
+            if not ble_scanning() and now-radar_ble_t>12: ble_scan_start(); radar_ble_t=now
         if screen=='calibrate' or (cal_msg and now-cal_msg_t<6) or (wifi_status and now-wifi_status_t<5): dirty=True
         if screen=='WiFiRoles' and ((roles_confirm and now-roles_confirm_t<4.2) or (roles_status and now-roles_status_t<6)): dirty=True
         if dirty or now-last_draw>=REFRESH:
@@ -1806,6 +1847,7 @@ while True:
             elif screen=='Radar:eviltwin': draw_radar_eviltwin(d)
             elif screen=='Radar:aphygiene': draw_radar_aphygiene(d)
             elif screen=='Radar:trackers': draw_radar_trackers(d)
+            elif screen=='Radar:audit': draw_radar_audit(d)
             elif screen=='HWInfo': draw_hwinfo(d)
             elif screen=='Settings': draw_settings(d)
             elif screen=='WiFiStatus': draw_wifistatus(d)
