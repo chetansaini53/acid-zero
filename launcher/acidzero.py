@@ -99,6 +99,8 @@ def ic(d,k,cx,cy,col):
         d.arc((cx-12,cy-12,cx+12,cy+12),0,360,fill=col,width=2); d.arc((cx-6,cy-6,cx+6,cy+6),0,360,fill=col,width=1); d.line((cx,cy,cx+9,cy-9),fill=col,width=2); d.ellipse((cx+4,cy-8,cx+8,cy-4),fill=col)
     elif k=='term':
         rr(d,(cx-12,cy-9,cx+12,cy+9),outline=col,w=2,r=3); d.line((cx-7,cy-4,cx-3,cy),fill=col,width=2); d.line((cx-3,cy,cx-7,cy+4),fill=col,width=2); d.line((cx-1,cy+4,cx+7,cy+4),fill=col,width=2)
+    elif k=='totp':
+        rr(d,(cx-9,cy-1,cx+9,cy+12),outline=col,w=2,r=3); d.arc((cx-6,cy-12,cx+6,cy+4),180,360,fill=col,width=2); d.ellipse((cx-2,cy+3,cx+2,cy+7),fill=col)
     else:
         rr(d,(cx-10,cy-10,cx+10,cy+10),outline=col,w=2,r=3)
 def ic_scaled(d,k,cx,cy,col,s=0.92):
