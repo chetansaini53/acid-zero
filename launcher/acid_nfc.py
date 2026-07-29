@@ -397,6 +397,26 @@ def write(kind: str, path: str) -> tuple[bool, str]:
     return False, "UID-only tag (nothing to write)"
 
 
+_KIND_LABEL = {"mfc": "Mifare Classic", "mfu": "Ultralight / NTAG",
+               "iso4": "secure card", "uid": "UID-only tag"}
+
+
+def write_compat(saved: dict, presented: dict) -> tuple:
+    """Pre-flight check before cloning: is the presented (target) card a writable
+    match for the saved dump? Returns (ok, reason); `reason` is a short user-facing
+    message when the card is the wrong or an unsupported type."""
+    want = (saved or {}).get("kind", "")
+    got = (presented or {}).get("kind", "uid")
+    if want not in ("mfc", "mfu"):
+        return False, "saved card has no writable data"
+    if got not in ("mfc", "mfu"):
+        # DESFire / Mifare Plus / bare smartcards / UID-only tags can't be cloned here
+        return False, "unsupported card / tag type - cannot write"
+    if got != want:
+        return False, "wrong card type - need %s" % _KIND_LABEL.get(want, "same type")
+    return True, ""
+
+
 def _tail(out: str) -> str:
     lines = [ln for ln in (out or "").strip().splitlines() if ln.strip()]
     return lines[-1][:40] if lines else ""

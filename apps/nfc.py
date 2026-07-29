@@ -264,7 +264,16 @@ def _w_write(ctx, card):
             _set(ctx, 'acid_nfc missing'); return
         if not card.get('_dump'):
             _set(ctx, 'UID-only card - nothing to write'); return
-        _set(ctx, 'place BLANK card, writing...')
+        # Identify the presented target FIRST, so a wrong or unsupported card is
+        # rejected up front instead of firing a blind write that fails cryptically.
+        _set(ctx, 'place the card to write on...')
+        tag = nfc.read(timeout=10)
+        if not tag:
+            _set(ctx, 'no card - place a card and retry'); return
+        ok_type, reason = nfc.write_compat(card, tag)
+        if not ok_type:
+            _set(ctx, reason); return
+        _set(ctx, 'writing to %s...' % tag.get('product', tag.get('type', 'card'))[:22])
         ok, msg = nfc.write(card.get('kind', 'mfc'), card['_dump'])
         _set(ctx, ('WRITE OK - cloned to card' if ok else 'write failed: %s' % msg))
     except Exception as e:
