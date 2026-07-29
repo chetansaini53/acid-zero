@@ -17,7 +17,11 @@ try:
 except Exception:
     nfc = None
 
-META = {'name': 'NFC', 'icon': 'nfc', 'color': (90, 175, 235)}
+# name matches the static 'NFC/RFID' grid tile in the launcher's APPS list, so
+# build_app_list() binds this plugin to that existing tile (icon 'wave') instead
+# of adding a duplicate. icon/color below are the fallback if that tile is ever
+# removed.
+META = {'name': 'NFC/RFID', 'icon': 'wave', 'color': (235, 70, 150)}
 
 SAVE_DIR = '/home/pi/acid_nfc_saved'
 TMP_DUMP = '/tmp/acid_nfc_dump'
@@ -27,10 +31,58 @@ _emu = nfc.Emulator() if nfc else None
 _busy = False
 _status = 'place a tag, tap READ'
 _reader = 'checking reader...'      # cached reader name; nfc-list is too slow to call per-frame
-_view = 'main'          # main | browse | card | savename | emulate | info
-_last = None             # freshly-read tag dict {uid,uid_spaced,atqa,sak,type,kind,dump}
+_view = 'main'          # main | browse | card | savename | emulate | info | detail
+_last = None             # freshly-read tag dict {uid,uid_spaced,atqa,sak,type,kind,dump,...}
 _info_off = 0
+_detail_off = 0
+_detail_card = None      # card dict currently shown in the full-detail view
+_detail_back = 'main'    # view the detail screen returns to (main | card)
+_info_back = 'main'      # view the (i) Learn screen returns to (main | detail)
 _spawn_lock = threading.Lock()
+
+# category -> badge label + colour + beginner copy (what / why / where / card-or-tag).
+# Copy fact-checked (workflow): NFC = a 13.56 MHz short-range branch of HF RFID.
+_CAT = {
+    'nfc-tag': {'label': 'NFC TAG', 'color': (70, 200, 120),
+        'what': 'A small NFC sticker or chip that stores a bit of data, like a link or text.',
+        'why': 'Cheap, rewritable, and almost any phone can read or write it with a tap.',
+        'where': 'Smart posters, product labels, business cards, home-automation tap points.',
+        'tag': 'Usually a sticker / tag'},
+    'rfid-card': {'label': 'RFID CARD', 'color': (70, 150, 235),
+        'what': 'A 13.56 MHz card (like Mifare Classic) holding an ID and small data blocks.',
+        'why': 'Identifies you for entry or travel; cheap, but uses older, weaker security.',
+        'where': 'Office door badges, hotel keys, metro / bus transit cards, gym cards.',
+        'tag': 'Usually a card'},
+    'secure-card': {'label': 'SECURE CARD', 'color': (235, 160, 45),
+        'what': 'A stronger 13.56 MHz card (DESFire) that uses real encryption to guard data.',
+        'why': 'Hard to clone, so it is used where money or safety really matters.',
+        'where': 'Contactless bank / payment cards, secure building access, newer transit.',
+        'tag': 'Usually a card'},
+    'other': {'label': 'SMART CARD', 'color': (160, 140, 215),
+        'what': 'An ISO 14443-4 smartcard (payment, passport, transit) - data sits behind an app.',
+        'why': 'Only its ID reads here; the real data needs the right keys / application.',
+        'where': 'Bank cards, e-passports, SIM-style secure elements, transit systems.',
+        'tag': 'Usually a card'},
+}
+
+
+def _wrap(text, width):
+    """Greedy word-wrap into lines of at most `width` chars (long words split)."""
+    out, line = [], ''
+    for w in str(text).split():
+        while len(w) > width:                       # hard-split an over-long token (e.g. a URL)
+            if line:
+                out.append(line); line = ''
+            out.append(w[:width]); w = w[width:]
+        if not line:
+            line = w
+        elif len(line) + 1 + len(w) <= width:
+            line += ' ' + w
+        else:
+            out.append(line); line = w
+    if line:
+        out.append(line)
+    return out or ['']
 
 _browse_rel = ''
 _browse_entries = []            # [(is_dir, abs_path, name, meta_or_None), ...]
@@ -40,6 +92,7 @@ _BROWSE_PER_PAGE = 7
 _card = None             # currently-open saved card meta dict (+ '_path','_dump')
 _name = ''
 _emu_uid = ''
+_emu_info = None         # the card dict being emulated (for the emulate screen's type/ATQA/SAK)
 
 
 def _set(ctx, s):
@@ -81,7 +134,8 @@ def _dump_ext(kind):
 def _write_meta(path, card):
     with open(path, 'w') as f:
         f.write('# Acid Zero NFC card\n')
-        for k in ('uid', 'uid_spaced', 'type', 'kind', 'atqa', 'sak'):
+        for k in ('uid', 'uid_spaced', 'type', 'product', 'family', 'category',
+                  'kind', 'atqa', 'sak', 'manufacturer', 'mem', 'uid_len', 'is_random'):
             f.write('%s: %s\n' % (k, card.get(k, '')))
         f.write('dump: %s\n' % (os.path.basename(card['_dump']) if card.get('_dump') else 'none'))
 
@@ -172,15 +226,31 @@ def _w_read(ctx):
         tag = nfc.read(timeout=12)
         if not tag:
             _set(ctx, 'no tag - place it and retry'); return
-        tag['dump'] = None
-        if tag.get('kind') in ('mfc', 'mfu'):
-            _set(ctx, 'tag %s - dumping data...' % tag['uid'])
-            ok, msg = nfc.dump(tag['kind'], TMP_DUMP + _dump_ext(tag['kind']))
-            if ok:
-                tag['dump'] = TMP_DUMP + _dump_ext(tag['kind'])
+        # Show the tag identity on the panel IMMEDIATELY (fast ~1s); the slower
+        # full-memory read (content / NDEF) fills in a moment later. No auto-navigation
+        # - the panel shows the result and the user taps it to open the detail screen.
+        tag['dump'] = None; tag['content'] = []
+        will_dump = tag.get('kind') in ('mfc', 'mfu')
+        tag['content_note'] = 'reading data...' if will_dump else ''
         _last = tag
-        _set(ctx, 'READ %s  (%s)%s' % (tag['uid'], tag['type'],
-                                       '' if tag['dump'] else ' UID-only'))
+        _set(ctx, 'reading data...' if will_dump else 'READ %s' % tag.get('product', tag.get('type', tag['uid'])))
+        if will_dump:
+            path = TMP_DUMP + _dump_ext(tag['kind'])
+            ok, msg = nfc.dump(tag['kind'], path)
+            if ok:
+                tag['dump'] = path
+                if tag['kind'] == 'mfu':                 # refine exact NTAG/UL model by size
+                    try:
+                        p, mem = nfc.mfu_product(os.path.getsize(path))
+                        tag['product'] = p; tag['type'] = p
+                        if mem:
+                            tag['mem'] = mem
+                    except Exception:
+                        pass
+                tag['content'], tag['content_note'] = nfc.read_content(tag['kind'], path)
+            else:
+                tag['content_note'] = 'could not read data (keys needed?)'
+            _set(ctx, 'READ %s' % tag.get('product', tag.get('type', tag['uid'])))
     except Exception as e:
         _set(ctx, 'read err: %s' % str(e)[:22])
     finally:
@@ -203,14 +273,15 @@ def _w_write(ctx, card):
         _busy = False; ctx.mark_dirty()
 
 
-def _w_emu_start(ctx, uid):
-    global _busy, _view, _emu_uid
+def _w_emu_start(ctx, card):
+    global _busy, _view, _emu_uid, _emu_info
     try:
         if _emu is None:
             _set(ctx, 'emulate unavailable'); return
-        ok, msg = _emu.start(uid)
+        uid = (card or {}).get('uid', '')
+        ok, msg = _emu.start(uid, (card or {}).get('atqa', ''), (card or {}).get('sak', ''))
         if ok:
-            _emu_uid = uid; _view = 'emulate'
+            _emu_uid = uid[:8]; _emu_info = card; _view = 'emulate'
         _set(ctx, msg)
     finally:
         _busy = False; ctx.mark_dirty()
@@ -273,22 +344,135 @@ def _touch_page_bar(tx, page, total, ctx):
     return None
 
 
+def _content_summary(card):
+    """One-line summary of what's on the tag, for the compact panel."""
+    recs = card.get('content') or []
+    if recs:
+        r = recs[0]
+        extra = '  (+%d more)' % (len(recs) - 1) if len(recs) > 1 else ''
+        return '%s: %s%s' % (r.get('kind', '?'), r.get('value', ''), extra)
+    note = card.get('content_note')
+    if note:
+        return note
+    if card.get('_dump') or card.get('dump') not in (None, '', 'none'):
+        return 'has data - tap for details'
+    return 'UID only - no stored data'
+
+
+def _ensure_content(card):
+    """Lazily parse NDEF/content for a saved card the first time its detail opens."""
+    if card is None or 'content' in card:
+        return
+    dp = card.get('_dump') or card.get('dump')
+    if dp and dp not in ('none', '') and nfc:
+        try:
+            card['content'], card['content_note'] = nfc.read_content(card.get('kind', ''), dp)
+            return
+        except Exception:
+            pass
+    card['content'] = []
+    card.setdefault('content_note', '')
+
+
 def _card_panel(d, ctx, box, card):
-    """Render a tag's identity (UID / type / ATQA / SAK) into a panel."""
+    """Compact identity summary: category badge, product, UID, content one-liner."""
     x0, y0, x1, y1 = box
     ctx.rr(d, box, fill=ctx.TILE, outline=ctx.LINE, w=1, r=6)
     if not card:
         ctx.ct(d, (x0 + x1) // 2, (y0 + y1) // 2, 'no tag read yet - tap READ', ctx.F_SM, ctx.DIM)
         return
-    ctx.lt(d, x0 + 12, y0 + 18, 'UID', ctx.F_TINY, ctx.DIM)
-    ctx.lt(d, x0 + 60, y0 + 18, card.get('uid_spaced', card.get('uid', '?')), ctx.F_NM, (120, 220, 255))
-    ctx.lt(d, x0 + 12, y0 + 40, card.get('type', '?')[:30], ctx.F_SM, ctx.FG)
-    tags = 'ATQA %s   SAK %s' % (card.get('atqa', '--'), card.get('sak', '--'))
-    ctx.lt(d, x0 + 12, y0 + 58, tags, ctx.F_TINY, ctx.DIM)
-    raw = card.get('dump')   # fresh read: a path/None; saved meta: basename or 'none'
-    has_dump = bool(card.get('_dump')) or (raw not in (None, '', 'none'))
-    ctx.ct(d, x1 - 52, y0 + 40, 'FULL DATA' if has_dump else 'UID ONLY',
-           ctx.F_TINY, (110, 220, 150) if has_dump else (235, 170, 90))
+    cat = _CAT.get(card.get('category', 'other'), _CAT['other'])
+    bw = 106
+    ctx.rr(d, (x0 + 10, y0 + 9, x0 + 10 + bw, y0 + 31), fill=cat['color'], r=6)
+    ctx.ct(d, x0 + 10 + bw // 2, y0 + 20, cat['label'], ctx.F_SM, (15, 20, 15))
+    ctx.lt(d, x0 + 10 + bw + 12, y0 + 20, card.get('product', card.get('type', '?'))[:24], ctx.F_NM, ctx.FG)
+    ctx.lt(d, x0 + 12, y0 + 46, 'UID', ctx.F_TINY, ctx.DIM)
+    ctx.lt(d, x0 + 48, y0 + 46, card.get('uid_spaced', card.get('uid', '?'))[:34], ctx.F_SM, (120, 220, 255))
+    ctx.lt(d, x0 + 12, y0 + 68, _content_summary(card)[:48], ctx.F_TINY,
+           (110, 220, 150) if card.get('content') else ctx.DIM)
+    ctx.ct(d, x1 - 44, y1 - 9, 'details >', ctx.F_TINY, ctx.ACC)
+
+
+# ---------- view: DETAIL (full auto-detected tag data, scrollable) ----------
+_DETAIL_VIS = 12
+
+
+def _detail_lines(card):
+    """Data-only lines for the detail view: the tag's identity + on-tag content.
+    The beginner what/why/where explainer lives behind the (i) button instead."""
+    L = [(10, 'IDENTITY', 'head')]
+    L.append((10, 'Standard: ISO 14443A  -  13.56 MHz', 'dim'))
+    L.append((10, 'UID:  ' + str(card.get('uid_spaced', card.get('uid', '?'))), 'val'))
+    if card.get('uid_len'):
+        L.append((10, 'UID size: %s bytes' % card.get('uid_len'), 'dim'))
+    if card.get('manufacturer'):
+        L.append((10, 'Made by:  ' + str(card.get('manufacturer')), 'fg'))
+    if card.get('mem'):
+        L.append((10, 'Memory:   ' + str(card.get('mem')), 'fg'))
+    L.append((10, 'ATQA %s    SAK %s' % (card.get('atqa', '--'), card.get('sak', '--')), 'dim'))
+    if card.get('is_random') in (True, 'True', '1'):
+        L.append((10, 'UID is RANDOM - changes every tap', 'warn'))
+    L.append((10, '', 'fg'))
+    L.append((10, 'CONTENT ON TAG', 'head'))
+    recs = card.get('content') or []
+    if recs:
+        for r in recs:
+            for w in _wrap('%s: %s' % (r.get('kind', '?'), r.get('value', '')), 52):
+                L.append((10, w, 'val'))
+    else:
+        for w in _wrap(card.get('content_note') or 'UID only - no stored data', 52):
+            L.append((10, w, 'dim'))
+    L.append((10, '', 'fg'))
+    L.append((10, 'tap  (i)  to learn what this is', 'dim'))
+    return L
+
+
+def _draw_detail(d, ctx):
+    global _detail_off
+    card = _detail_card
+    ctx.topbar(d, (card.get('product', 'TAG') if card else 'TAG')[:20])
+    ctx.rr(d, (306, 4, 348, 24), outline=(70, 130, 235), w=1, r=5)
+    ctx.ct(d, 327, 14, '(i)', ctx.F_SM, (70, 130, 235))
+    _btn(ctx, d, (370, 3, 472, 25), 'BACK', (45, 52, 68), ctx.ACC, ctx.F_SM)
+    if not card:
+        ctx.ct(d, 240, 150, 'no tag', ctx.F_NM, ctx.DIM); return
+    cat = _CAT.get(card.get('category', 'other'), _CAT['other'])
+    ctx.rr(d, (8, 32, 472, 60), fill=cat['color'], r=8)
+    ctx.ct(d, 240, 46, '%s   %s' % (cat['label'], str(card.get('product', ''))[:24]), ctx.F_NM, (15, 20, 15))
+    lines = _detail_lines(card)
+    total = len(lines); maxoff = max(0, total - _DETAIL_VIS)
+    _detail_off = min(max(_detail_off, 0), maxoff)
+    _COL = {'head': ctx.ACC, 'fg': ctx.FG, 'dim': ctx.DIM, 'val': (120, 220, 255), 'warn': (235, 170, 40)}
+    y = 66
+    for indent, txt, ck in lines[_detail_off:_detail_off + _DETAIL_VIS]:
+        if txt:
+            ctx.lt(d, indent, y, txt, ctx.F_SM, _COL.get(ck, ctx.FG))
+        y += 18
+    if total > _DETAIL_VIS:
+        by = ctx.H - 22
+        ctx.rr(d, (10, by, 120, by + 19), outline=ctx.LINE, w=1, r=6)
+        ctx.ct(d, 65, by + 9, 'UP', ctx.F_SM, ctx.FG if _detail_off > 0 else ctx.DIM)
+        ctx.ct(d, 240, by + 9, '%d-%d / %d' % (_detail_off + 1, min(_detail_off + _DETAIL_VIS, total), total), ctx.F_TINY, ctx.DIM)
+        ctx.rr(d, (360, by, 470, by + 19), outline=ctx.LINE, w=1, r=6)
+        ctx.ct(d, 415, by + 9, 'DOWN', ctx.F_SM, ctx.FG if _detail_off < maxoff else ctx.DIM)
+
+
+def _touch_detail(tx, ty, ctx):
+    global _view, _detail_off, _info_back, _info_off
+    if ty <= 25 and tx >= 370 and ctx.debounce(0.3):
+        _view = _detail_back if _detail_back in ('main', 'card') else 'main'; ctx.mark_dirty(); return
+    if ty <= 25 and 300 <= tx <= 352 and ctx.debounce(0.3):     # (i) -> Learn (returns to detail)
+        _info_back = 'detail'; _info_off = 0; _view = 'info'; ctx.mark_dirty(); return
+    card = _detail_card
+    if not card:
+        return
+    total = len(_detail_lines(card)); maxoff = max(0, total - _DETAIL_VIS)
+    if total > _DETAIL_VIS and ctx.H - 22 <= ty <= ctx.H - 2 and ctx.debounce(0.15):
+        st = max(1, _DETAIL_VIS - 2)
+        if tx <= 120 and _detail_off > 0:
+            _detail_off = max(0, _detail_off - st); ctx.mark_dirty()
+        elif tx >= 360 and _detail_off < maxoff:
+            _detail_off = min(maxoff, _detail_off + st); ctx.mark_dirty()
 
 
 # ---------- view: MAIN (read) ----------
@@ -314,18 +498,20 @@ def _draw_main(d, ctx):
 
 
 def _touch_main(tx, ty, ctx):
-    global _view, _name, _browse_rel, _browse_page, _info_off
+    global _view, _name, _browse_rel, _browse_page, _info_off, _detail_card, _detail_off, _detail_back, _info_back
     if ty <= 24 and 250 <= tx <= 290 and ctx.debounce(0.3):
-        _info_off = 0; _view = 'info'; ctx.mark_dirty(); return
+        _info_off = 0; _info_back = 'main'; _view = 'info'; ctx.mark_dirty(); return
     if ty <= 25 and tx >= 370 and ctx.debounce(0.3):
         _browse_rel = ''; _browse_page = 0; _refresh_browse(); _view = 'browse'; ctx.mark_dirty(); return
+    if 41 <= ty <= 128 and _last and ctx.debounce(0.3):     # tap identity panel -> full detail (41 clears the launcher back-zone)
+        _detail_card = _last; _ensure_content(_last); _detail_off = 0; _detail_back = 'main'; _view = 'detail'; ctx.mark_dirty(); return
     if 138 <= ty <= 190:
         if tx <= 158 and ctx.debounce(0.5):
             _spawn(ctx, _w_read); ctx.mark_dirty()
         elif tx <= 316 and _last and ctx.debounce(0.4):
             _name = ''; _view = 'savename'; ctx.mark_dirty()
         elif tx >= 320 and _last and ctx.debounce(0.4):
-            _spawn(ctx, _w_emu_start, _last.get('uid', '')); ctx.mark_dirty()
+            _spawn(ctx, _w_emu_start, _last); ctx.mark_dirty()
 
 
 # ---------- view: BROWSE (saved library) ----------
@@ -407,14 +593,16 @@ def _draw_card(d, ctx):
 
 
 def _touch_card(tx, ty, ctx):
-    global _view, _card
+    global _view, _card, _detail_card, _detail_off, _detail_back
     if ty <= 25 and tx >= 370 and ctx.debounce(0.3):
         _refresh_browse(); _view = 'browse'; ctx.mark_dirty(); return
+    if 41 <= ty <= 128 and _card and ctx.debounce(0.3):     # tap identity panel -> full detail (41 clears the launcher back-zone)
+        _detail_card = _card; _ensure_content(_card); _detail_off = 0; _detail_back = 'card'; _view = 'detail'; ctx.mark_dirty(); return
     if 140 <= ty <= 194 and _card:
         if tx <= 158 and _card.get('_dump') and ctx.debounce(0.5):
             _spawn(ctx, _w_write, _card); ctx.mark_dirty()
         elif 162 <= tx <= 316 and ctx.debounce(0.4):
-            _spawn(ctx, _w_emu_start, _card.get('uid', '')); ctx.mark_dirty()
+            _spawn(ctx, _w_emu_start, _card); ctx.mark_dirty()
         elif tx >= 320 and ctx.debounce(0.4):
             _delete_card(_card['_path']); _view = 'browse'; ctx.mark_dirty()
 
@@ -422,14 +610,23 @@ def _touch_card(tx, ty, ctx):
 # ---------- view: EMULATE (running) ----------
 def _draw_emulate(d, ctx):
     ctx.topbar(d, 'EMULATING')
-    ctx.rr(d, (8, 60, 472, 150), fill=(28, 20, 44), outline=(150, 95, 235), w=2, r=10)
-    ctx.ct(d, 240, 86, 'PRESENTING UID', ctx.F_SM, (200, 170, 245))
-    ctx.ct(d, 240, 116, _emu_uid.upper() or '--', ctx.F_BIG, (185, 150, 255))
+    info = _emu_info or {}
+    cat = _CAT.get(info.get('category', 'other'), _CAT['other'])
+    # type badge - so you know which protocol/card the reader will see
+    ctx.rr(d, (8, 34, 472, 60), fill=cat['color'], r=8)
+    ctx.ct(d, 240, 47, '%s   %s' % (cat['label'], str(info.get('product', 'tag'))[:22]), ctx.F_NM, (15, 20, 15))
+    # UID + protocol signature panel
+    ctx.rr(d, (8, 66, 472, 170), fill=(28, 20, 44), outline=(150, 95, 235), w=2, r=10)
+    ctx.ct(d, 240, 88, 'PRESENTING TO READER', ctx.F_SM, (200, 170, 245))
+    ctx.ct(d, 240, 118, _emu_uid.upper() or '--', ctx.F_BIG, (185, 150, 255))
+    ctx.ct(d, 240, 148, 'ATQA %s   SAK %s   -   ISO 14443A' % (info.get('atqa', '----'), info.get('sak', '--')),
+           ctx.F_SM, (200, 170, 245))
     running = _emu.running if _emu else False
-    ctx.ct(d, 240, 168, 'ON AIR - read it on your Flipper now' if running else 'stopped', ctx.F_SM,
+    ctx.ct(d, 240, 186, 'ON AIR - read it on your Flipper now' if running else 'stopped', ctx.F_SM,
            (110, 220, 150) if running else ctx.DIM)
-    _btn(ctx, d, (140, 200, 340, 252), 'STOP', (200, 60, 60), (255, 240, 240))
-    ctx.ct(d, 240, 274, 'UID-only emulation (PN532 limit) - sectors not replayed', ctx.F_TINY, ctx.DIM)
+    _btn(ctx, d, (140, 200, 340, 248), 'STOP', (200, 60, 60), (255, 240, 240))
+    ctx.ct(d, 240, 266, 'Flipper will read it as: %s' % str(info.get('product', 'this type'))[:32], ctx.F_TINY, ctx.DIM)
+    ctx.ct(d, 240, 284, 'UID + type presented; data sectors not replayed (PN532 limit)', ctx.F_TINY, ctx.DIM)
 
 
 def _touch_emulate(tx, ty, ctx):
@@ -484,6 +681,14 @@ def _touch_savename(tx, ty, ctx):
 
 # ---------- view: INFO (educational Learn, scrollable) ----------
 NFC_INFO = [
+    (14, 'NFC vs RFID (simple)', (150, 200, 255)),
+    (20, 'RFID = reading a chip wirelessly with radio -', 'fg'),
+    (20, 'no touching, and the tag needs no battery.', 'fg'),
+    (20, 'NFC is the short-range 13.56 MHz branch of RFID:', 'fg'),
+    (20, 'you TAP the tag on the reader. Phones do NFC.', 'fg'),
+    (20, 'This reader does NFC tags + 13.56 MHz cards, NOT', 'dim'),
+    (20, 'the old 125 kHz fobs (that is a different radio).', 'dim'),
+    (0, '', 'fg'),
     (14, 'WHAT IS THIS?', (150, 200, 255)),
     (20, 'Reads, saves, clones and emulates 13.56 MHz', 'fg'),
     (20, 'contactless tags (NFC / RFID) with the ACR122U.', 'fg'),
@@ -509,15 +714,43 @@ NFC_INFO = [
 _INFO_VIS = 13
 
 
+def _info_lines():
+    """Learn content: the current tag's category explainer (if a tag is loaded)
+    at the top, then the general NFC-vs-RFID / detect-defend copy."""
+    card = _detail_card or _last
+    L = []
+    if card and card.get('category') in _CAT:
+        cat = _CAT[card['category']]
+        prod = str(card.get('product', card.get('type', '')))[:26]
+        L.append((14, 'THIS TAG: ' + cat['label'], cat['color']))
+        if prod:
+            L.append((20, prod, 'fg'))
+        for w in _wrap(cat['what'], 50):
+            L.append((20, w, 'fg'))
+        L.append((0, '', 'fg'))
+        L.append((14, 'WHY IT EXISTS', (120, 220, 150)))
+        for w in _wrap(cat['why'], 50):
+            L.append((20, w, 'fg'))
+        L.append((0, '', 'fg'))
+        L.append((14, 'WHERE IT IS USED', (235, 180, 40)))
+        for w in _wrap(cat['where'], 50):
+            L.append((20, w, 'fg'))
+        L.append((20, cat['tag'], 'dim'))
+        L.append((0, '', 'fg'))
+    L.extend(NFC_INFO)
+    return L
+
+
 def _draw_info(d, ctx):
     global _info_off
     ctx.topbar(d, 'NFC - LEARN')
     ctx.rr(d, (418, 4, 472, 24), outline=ctx.ACC, w=1, r=8)
     ctx.ct(d, 445, 14, 'back', ctx.F_TINY, ctx.ACC)
-    total = len(NFC_INFO); maxoff = max(0, total - _INFO_VIS)
+    lines = _info_lines()
+    total = len(lines); maxoff = max(0, total - _INFO_VIS)
     _info_off = min(max(_info_off, 0), maxoff)
     y = 38
-    for indent, txt, ck in NFC_INFO[_info_off:_info_off + _INFO_VIS]:
+    for indent, txt, ck in lines[_info_off:_info_off + _INFO_VIS]:
         if txt:
             col = ctx.FG if ck == 'fg' else ctx.DIM if ck == 'dim' else ck
             ctx.lt(d, indent, y, txt, ctx.F_SM, col)
@@ -534,8 +767,8 @@ def _draw_info(d, ctx):
 def _touch_info(tx, ty, ctx):
     global _view, _info_off
     if ty <= 24 and tx >= 418 and ctx.debounce(0.3):
-        _view = 'main'; ctx.mark_dirty(); return
-    total = len(NFC_INFO); maxoff = max(0, total - _INFO_VIS)
+        _view = _info_back if _info_back in ('main', 'detail') else 'main'; ctx.mark_dirty(); return
+    total = len(_info_lines()); maxoff = max(0, total - _INFO_VIS)
     if total > _INFO_VIS and ctx.H - 24 <= ty <= ctx.H - 2 and ctx.debounce(0.2):
         st = max(1, _INFO_VIS - 2)
         if tx <= 120 and _info_off > 0:
@@ -547,9 +780,9 @@ def _touch_info(tx, ty, ctx):
 # ---------- dispatch ----------
 def draw(d, ctx):
     {'browse': _draw_browse, 'card': _draw_card, 'emulate': _draw_emulate,
-     'savename': _draw_savename, 'info': _draw_info}.get(_view, _draw_main)(d, ctx)
+     'savename': _draw_savename, 'info': _draw_info, 'detail': _draw_detail}.get(_view, _draw_main)(d, ctx)
 
 
 def handle_touch(tx, ty, ctx):
     {'browse': _touch_browse, 'card': _touch_card, 'emulate': _touch_emulate,
-     'savename': _touch_savename, 'info': _touch_info}.get(_view, _touch_main)(tx, ty, ctx)
+     'savename': _touch_savename, 'info': _touch_info, 'detail': _touch_detail}.get(_view, _touch_main)(tx, ty, ctx)

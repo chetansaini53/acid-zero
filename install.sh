@@ -52,7 +52,7 @@ log "Dependencies (apt)"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq || warn "apt update failed — continuing with the local cache"
 apt-get install -y python3-pil python3-numpy python3-serial python3-smbus i2c-tools \
-                   python3-dbus python3-gi \
+                   python3-dbus python3-gi openssl libnfc-bin \
                    aircrack-ng hcxtools hostapd dnsmasq bluez
 ok "apt packages installed"
 # hostapd + dnsmasq install as always-on units (dnsmasq binds :53); Acid Zero's Evil
@@ -123,6 +123,63 @@ bundle firmware/circuitpython/circuitpython-pico2w.uf2            "$FW/"
 bundle firmware/pico-badusb/code.py                              "$FW/pico-badusb/"
 bundle firmware/pico-badusb/boot.py                              "$FW/pico-badusb/"
 bundle firmware/pico-badusb/lib                                  "$FW/pico-badusb/"
+
+# --- 4b. NFC/RFID reader (ACR122U) -------------------------------------------
+# The ACS ACR122U is a PN532 USB reader libnfc drives natively (acr122_usb).
+# libnfc-bin (installed above) gives read/dump/clone; two one-time fixes + an
+# optional source-built emulator complete it. Entire section is never fatal.
+log "NFC/RFID reader (ACR122U)"
+# (a) The kernel's pn533/nfc modules grab the reader before libnfc can — blacklist
+#     them so libnfc owns the ACR122U (takes effect on the next reboot).
+NFC_BL=/etc/modprobe.d/blacklist-libnfc.conf
+if grep -q '^blacklist pn533$' "$NFC_BL" 2>/dev/null; then
+  ok "pn533/nfc kernel modules already blacklisted"
+else
+  printf 'blacklist pn533\nblacklist pn533_usb\nblacklist nfc\n' > "$NFC_BL"
+  ok "blacklisted pn533/pn533_usb/nfc ($NFC_BL) — unbinds at next reboot"
+fi
+# (b) A stock /etc/nfc/libnfc.conf may pin a serial device (pn532_uart:/dev/ttyUSB0)
+#     that errors first; comment it so libnfc autoscans and finds the USB ACR122U.
+NFC_CONF=/etc/nfc/libnfc.conf
+if [ -f "$NFC_CONF" ] && grep -qE '^[[:space:]]*device\.connstring' "$NFC_CONF"; then
+  sed -i 's/^[[:space:]]*device\.connstring/# device.connstring/' "$NFC_CONF"
+  ok "libnfc.conf: neutralized stray serial device (USB autoscan only)"
+fi
+# (c) EMULATE (present a saved UID for a Flipper to read) needs nfc-emulate-uid, a
+#     libnfc *example* tool Debian doesn't package. Build it from the pinned,
+#     sha256-verified upstream release against the system libnfc, using a minimal
+#     toolchain (gcc + libc6-dev, not full build-essential). Optional + never fatal:
+#     read/dump/clone all work without it and the NFC app degrades gracefully.
+build_nfc_emulate() {
+  if command -v nfc-emulate-uid >/dev/null 2>&1; then ok "nfc-emulate-uid already present"; return 0; fi
+  local ver=1.8.0
+  local sha=6d9ad31c86408711f0a60f05b1933101c7497683c2e0d8917d1611a3feba3dd5
+  local url=https://github.com/nfc-tools/libnfc/releases/download/libnfc-$ver/libnfc-$ver.tar.bz2
+  local tmp; tmp=$(mktemp -d) || return 0
+  if ! apt-get install -y --no-install-recommends gcc libc6-dev libnfc-dev wget >/dev/null 2>&1; then
+    warn "nfc-emulate-uid: build tools unavailable — EMULATE off (read/clone still work)"; rm -rf "$tmp"; return 0; fi
+  if ! wget -qO "$tmp/s.tar.bz2" "$url"; then
+    warn "nfc-emulate-uid: source download failed — EMULATE off"; rm -rf "$tmp"; return 0; fi
+  if ! printf '%s  %s\n' "$sha" "$tmp/s.tar.bz2" | sha256sum -c - >/dev/null 2>&1; then
+    warn "nfc-emulate-uid: sha256 mismatch — refusing to build"; rm -rf "$tmp"; return 0; fi
+  # Patch in the -a ATQA / -s SAK options so emulation presents the real card's
+  # protocol signature (else a Flipper sees the hardcoded Classic-1K default and
+  # reports "multiple protocols"). Non-fatal: if the patch anchor is absent the
+  # build simply falls to the warn branch below.
+  if tar xjf "$tmp/s.tar.bz2" -C "$tmp" \
+     && python3 "$REPO/patches/nfc-emulate-uid.py" "$tmp/libnfc-$ver/examples/nfc-emulate-uid.c" >/dev/null 2>&1 \
+     && gcc -O2 -o "$tmp/nfc-emulate-uid" \
+            "$tmp/libnfc-$ver/examples/nfc-emulate-uid.c" \
+            "$tmp/libnfc-$ver/utils/nfc-utils.c" \
+            -I"$tmp/libnfc-$ver" -I"$tmp/libnfc-$ver/utils" -lnfc >/dev/null 2>&1 \
+     && install -m 0755 "$tmp/nfc-emulate-uid" /usr/local/bin/nfc-emulate-uid; then
+    ok "built nfc-emulate-uid (UID + protocol emulation) → /usr/local/bin"
+  else
+    warn "nfc-emulate-uid: build failed — EMULATE off (read/clone still work)"
+  fi
+  rm -rf "$tmp"
+}
+build_nfc_emulate
 
 # --- 5. enable services ------------------------------------------------------
 log "Enable services"

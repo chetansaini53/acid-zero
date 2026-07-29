@@ -252,6 +252,53 @@ a Pico already on CircuitPython is updated in place. See
 [firmware/circuitpython/README.md](firmware/circuitpython/README.md) and
 [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md) for the bundled-binary provenance.
 
+## 8b. NFC/RFID reader (ACR122U)
+
+The **NFC/RFID** app reads, saves, clones and emulates 13.56 MHz tags with an
+**ACS ACR122U** USB reader — a PN532 device libnfc drives natively (`acr122_usb`),
+no wiring. `install.sh` sets this all up; the steps (and the manual equivalent) are:
+
+```
+# 1. libnfc CLI tools (read / dump / clone). Installed by install.sh step 2.
+sudo apt install -y libnfc-bin
+
+# 2. The kernel's pn533/nfc modules claim the reader before libnfc — blacklist them.
+printf 'blacklist pn533\nblacklist pn533_usb\nblacklist nfc\n' | \
+  sudo tee /etc/modprobe.d/blacklist-libnfc.conf
+sudo reboot        # ONE-TIME: needed so the modules actually unbind
+
+# 3. If /etc/nfc/libnfc.conf pins a serial device it errors on, comment it so
+#    libnfc autoscans USB:  sudo sed -i 's/^\s*device.connstring/# &/' /etc/nfc/libnfc.conf
+
+# 4. Verify the reader (no tag needed):
+sudo nfc-list        # -> "NFC device: ACS / ACR122U PICC Interface opened"
+```
+
+**READ / DUMP / CLONE** work with `libnfc-bin` alone (Mifare Classic 1K/4K, NTAG,
+Ultralight). **EMULATE** (present a saved UID for a Flipper to read) needs
+`nfc-emulate-uid`, a libnfc *example* tool Debian doesn't package — `install.sh`
+builds it from the pinned, sha256-verified upstream release against the system
+libnfc (minimal `gcc` + `libc6-dev`, no full toolchain). To build it by hand:
+
+```
+sudo apt install -y --no-install-recommends gcc libc6-dev libnfc-dev wget
+cd /tmp && wget https://github.com/nfc-tools/libnfc/releases/download/libnfc-1.8.0/libnfc-1.8.0.tar.bz2
+echo '6d9ad31c86408711f0a60f05b1933101c7497683c2e0d8917d1611a3feba3dd5  libnfc-1.8.0.tar.bz2' | sha256sum -c -
+tar xjf libnfc-1.8.0.tar.bz2 && cd libnfc-1.8.0
+# add -a ATQA / -s SAK so emulation presents the real card's protocol signature
+# (stock nfc-emulate-uid hard-codes Classic-1K, which makes a Flipper report
+# "multiple protocols" for an NTAG etc.). <repo> = this acid-zero checkout.
+python3 <repo>/patches/nfc-emulate-uid.py examples/nfc-emulate-uid.c
+gcc -O2 -o nfc-emulate-uid examples/nfc-emulate-uid.c utils/nfc-utils.c -I. -Iutils -lnfc
+sudo install -m 0755 nfc-emulate-uid /usr/local/bin/
+```
+
+Emulation presents the card's UID **and** its protocol signature (ATQA/SAK) so a
+reader/Flipper identifies the correct type. It remains a PN532 hardware limit that
+only the UID + type are replayed (not the data sectors), and custom UIDs are 4-byte
+(a 7-byte UID is truncated to its first 4 bytes). Own-lab / authorized cards only
+(see [ETHICS.md](ETHICS.md)).
+
 ## 9. Adding apps (plugins)
 
 - **Python plugin:** drop a `.py` with a `META = {name, icon, color}` dict and a
@@ -268,6 +315,10 @@ a Pico already on CircuitPython is updated in place. See
 - **`ModuleNotFoundError: PIL` / `numpy` in the log** — the apt deps (step 4) aren't
   installed for the system python. `sudo apt install python3-pil python3-numpy`.
 - **IR / Sub-GHz / GPS plugin says "pyserial missing"** — `sudo apt install python3-serial`.
+- **NFC app: "no reader" / `nfc-list` errors on `/dev/ttyUSB0`** — the kernel grabbed
+  the ACR122U or `libnfc.conf` pins a serial device. Do steps 2–3 of §8b, `sudo reboot`,
+  then `sudo nfc-list`. **EMULATE says "nfc-emulate-uid not installed"** — build it (§8b);
+  read/dump/clone still work without it.
 - **Flasher: "esptool not installed"** — it was pip-installed into your *login* account,
   not the system, so the root launcher can't see it. Reinstall system-wide (step 8).
 - **Bad USB CONNECT: "AP connected but Pico not responding"** — the Pi and Pico radios
