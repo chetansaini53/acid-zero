@@ -160,6 +160,7 @@ ls /etc/NetworkManager/system-connections/ 2>/dev/null
 cat /etc/wpa_supplicant/wpa_supplicant.conf 2>/dev/null
 ls /etc/pwnagotchi/*.pem 2>/dev/null
 ls /etc/acid-totp.json /etc/.acidtotp* 2>/dev/null         # TOTP 2FA seeds - must be gone
+ls /run/acid_fileap 2>/dev/null                            # File Server creds - tmpfs, empty (off-by-default, never enabled)
 find / -xdev -name '*.pcap*' 2>/dev/null
 
 # Confirm license files are STILL present (must NOT be removed)

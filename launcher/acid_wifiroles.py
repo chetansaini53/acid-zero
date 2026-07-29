@@ -149,6 +149,87 @@ def resolve(role, roles=None, present=None):
     return None, None   # only the live SSH adapter is left - refuse (never kill SSH)
 
 
+_IW = '/usr/sbin/iw' if os.path.exists('/usr/sbin/iw') else 'iw'
+
+
+def _ap_capable(iface):
+    """True if the iface's phy advertises AP mode. Absolute iw path: the launcher's systemd
+    PATH has /usr/sbin, but a plain user shell may not (iw is command-not-found there)."""
+    try:
+        phy = os.path.basename(os.readlink('/sys/class/net/%s/phy80211' % iface))
+        out = subprocess.run([_IW, 'phy', phy, 'info'], capture_output=True,
+                             text=True, timeout=4).stdout
+        return any(ln.strip() == '* AP' for ln in out.splitlines())
+    except Exception:
+        return False
+
+
+def _busy_monitor(iface):
+    """True if the adapter is CURRENTLY monitoring - itself type monitor (803) or sharing its
+    phy with an active *mon vif (pwnagotchi/bettercap). Only avoid radios actually in use now,
+    not ones merely role-reserved for monitor - else no AP radio is ever free."""
+    try:
+        if open('/sys/class/net/%s/type' % iface).read().strip() == '803':
+            return True
+        phy = os.path.basename(os.readlink('/sys/class/net/%s/phy80211' % iface))
+        for p in glob.glob('/sys/class/net/*mon'):
+            try:
+                if os.path.basename(os.readlink(p + '/phy80211')) == phy:
+                    return True
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return False
+
+
+def _ssh_ifaces():
+    """Local ifaces carrying an ESTABLISHED SSH (:22) session - the REAL sacred set, derived
+    from the sockets themselves, NOT the default route. A gateway-less lab net has no default
+    route, so active_uplink_iface() returns None and the default-route heuristic would fail
+    OPEN on the SSH adapter; the :22 sockets identify SSH regardless of routing."""
+    out = set()
+    try:
+        ip2if = {}
+        for ln in subprocess.run(['ip', '-o', '-4', 'addr', 'show'], capture_output=True,
+                                 text=True, timeout=3).stdout.splitlines():
+            p = ln.split()
+            if len(p) >= 4:
+                ip2if[p[3].split('/')[0]] = p[1]
+        ss = next((c for c in ('/usr/sbin/ss', '/usr/bin/ss', '/sbin/ss') if os.path.exists(c)), 'ss')
+        o = subprocess.run([ss, '-tnH', 'state', 'established', '( sport = :22 )'],
+                           capture_output=True, text=True, timeout=3).stdout
+        for ln in o.splitlines():
+            parts = ln.split()
+            if len(parts) >= 3:
+                local = parts[2].rsplit(':', 1)[0].strip('[]')
+                if local in ip2if:
+                    out.add(ip2if[local])
+    except Exception:
+        pass
+    return out
+
+
+def resolve_ap(present=None, roles=None):
+    """-> (iface, chipset) for an on-demand AP: highest-PRIORITY AP-capable adapter that is
+    NEITHER carrying the live SSH session NOR currently monitoring. FAIL CLOSED: the SSH set
+    comes from established :22 sockets AND the default route; if NO protected iface can be
+    identified, refuse (never risk stranding SSH on a gateway-less net). PRIORITY tries the
+    2.4G RTL8188EUS first, leaving the dual-band Alfa free for monitor when possible."""
+    present = present if present is not None else present_adapters()
+    protected = _ssh_ifaces()
+    live = active_uplink_iface()
+    if live:
+        protected.add(live)
+    if not protected:
+        return None, None                    # cannot prove which radio carries SSH -> refuse (fail-closed)
+    for chip in PRIORITY:
+        iface = present.get(chip)
+        if iface and iface not in protected and not _busy_monitor(iface) and _ap_capable(iface):
+            return iface, chip
+    return None, None
+
+
 def role_of(chipset, roles=None):
     """Which role(s) a chipset is explicitly PINNED to (for the conflict note).
     '' if none."""
