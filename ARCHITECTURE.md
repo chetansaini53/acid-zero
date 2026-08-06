@@ -2,6 +2,64 @@
 
 How the system is put together: a **UI brain** on the Raspberry Pi, a dedicated **radio brain** on an ESP32 co-processor, and a clean serial contract between them. This is the same split a Flipper Zero uses (an MCU owns the radios; the application core just talks to it) — chosen here deliberately, for the reasons below.
 
+## System overview
+
+Acid Zero is a **three-processor** embedded system. The Raspberry Pi 3B+ owns the
+touch UI and all high-level logic; two microcontroller co-processors handle the
+real-time / physical-layer work a preempted Linux userspace process cannot do
+reliably. Peripherals are attached over USB, SPI and I²C and bound deterministically.
+
+### 1. Processor topology
+
+```mermaid
+flowchart LR
+  subgraph PI["Raspberry Pi 3B+ - UI brain, Python"]
+    L["framebuffer launcher<br/>screen state machine<br/>two-tier plugin host"]
+  end
+  subgraph ESP["ESP32 - radio co-processor, Arduino"]
+    R["CC1101 sub-GHz + IR TX/RX<br/>RMT hardware-timed edges"]
+  end
+  subgraph PICO["Pi Pico 2 W - HID co-processor, CircuitPython"]
+    B["Bad USB, self-hosted WPA2 AP<br/>DuckyScript to USB HID"]
+  end
+  L -->|USB serial 115200| R
+  L -->|joins Pico AP on a spare adapter| B
+  L -->|USB, libnfc| NFC["ACR122U<br/>13.56 MHz NFC/RFID"]
+  L -->|5x USB, bound by USB id| WIFI["Wi-Fi adapter fleet"]
+  L -->|USB, NMEA| GPS["USB GPS"]
+  L -->|SPI0, fbtft| TFT["3.5in ILI9486<br/>480x320 + resistive touch"]
+```
+
+### 2. Display + touch pipeline
+
+The UI never touches a display server or GUI toolkit — the render path *is* the panel,
+and touch comes back through a calibrated affine transform.
+
+```mermaid
+flowchart LR
+  APP["launcher draw<br/>Pillow RGB frame"] -->|pack| PACK["RGB565<br/>numpy uint16"]
+  PACK -->|raw bytes ~30 fps| FB["/dev/fb1"] --> PANEL["ILI9486 panel"]
+  TOUCH["resistive touch<br/>XPT2046"] -->|evdev| RAW["raw ADC coords"]
+  RAW -->|acid_touchcal| CAL["affine calibration<br/>lstsq + residual reject"]
+  CAL -->|screen x,y| EV["tap event"]
+  EV --> APP
+```
+
+### 3. Wi-Fi adapter roles (fail-closed)
+
+Multiple adapters let one radio stay a **sacred** management/SSH link while others do
+monitor / injection or host an on-demand AP. The role manager **fails closed** — if the
+only free adapter is carrying the live SSH session, it refuses rather than drop the link.
+
+```mermaid
+flowchart TB
+  MGR["acid_wifiroles<br/>role manager, fail-closed"]
+  MGR -->|management| SSH["SSH / uplink<br/>RTL8188EUS + onboard<br/>SACRED, never touched"]
+  MGR -->|attack| MON["monitor / injection<br/>Alfa AWUS036ACM / ACH<br/>TP-Link Archer T2U"]
+  MGR -->|service| AP["on-demand AP<br/>Evil Portal / File Server<br/>picks a free non-SSH radio"]
+  MGR -->|no free non-SSH radio| STOP["refuse, SSH stays up<br/>resolve_ap returns none"]
+```
+
 ![Architecture](docs/architecture.svg)
 
 ```
