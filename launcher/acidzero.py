@@ -1,6 +1,7 @@
 import glob,os,io,time,socket,subprocess,urllib.request,json,base64,re,struct,select,threading,math
 from PIL import Image,ImageOps,ImageDraw,ImageFont
 import numpy as np
+import acid_touchcal
 try: import acid_wifiroles
 except Exception: acid_wifiroles=None
 THEMES={
@@ -338,8 +339,7 @@ def cpu():
         return max(0,min(100,int(100.0*(dt-di)/dt))) if dt>0 else 0
     except Exception: return 0
 def map_touch(rx,ry):
-    sx=CAL[0]*rx+CAL[1]*ry+CAL[2]; sy=CAL[3]*rx+CAL[4]*ry+CAL[5]
-    return max(0,min(W-1,int(round(sx)))),max(0,min(H-1,int(round(sy))))
+    return acid_touchcal.apply_calibration(CAL,rx,ry,W,H)
 _tap={'t':0.0,'x':-1,'y':-1,'rx':0,'ry':0}
 def find_touch():
     for e in sorted(glob.glob('/sys/class/input/event*')):
@@ -1567,12 +1567,9 @@ while True:
                 cal_raws.append((_tap['rx'],_tap['ry']))
                 if len(cal_raws)>=4:
                     try:
-                        A=np.array([[float(r[0]),float(r[1]),1.0] for r in cal_raws])
-                        txs=np.array([float(t[0]) for t in CAL_TARGETS]); tys=np.array([float(t[1]) for t in CAL_TARGETS])
-                        cx_=np.linalg.lstsq(A,txs,rcond=None)[0]; cy_=np.linalg.lstsq(A,tys,rcond=None)[0]
-                        px=A.dot(cx_); py=A.dot(cy_); res=float(np.max(((px-txs)**2+(py-tys)**2)**0.5))
+                        _coeffs,res=acid_touchcal.solve_calibration(cal_raws,CAL_TARGETS)
                         if res<=45:
-                            CAL[0],CAL[1],CAL[2]=float(cx_[0]),float(cx_[1]),float(cx_[2]); CAL[3],CAL[4],CAL[5]=float(cy_[0]),float(cy_[1]),float(cy_[2]); save_cal(); cal_msg='calib OK  err %dpx'%int(res)
+                            CAL[:]=_coeffs; save_cal(); cal_msg='calib OK  err %dpx'%int(res)
                         else: cal_msg='calib REJECTED  err %dpx - retry'%int(res)
                     except Exception: cal_msg='calib error'
                     cal_msg_t=now; cal_raws=[]; screen='Settings'
